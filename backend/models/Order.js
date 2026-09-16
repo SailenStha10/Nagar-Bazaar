@@ -18,6 +18,12 @@ const orderSchema = new mongoose.Schema(
       default: 'placed',
     },
     deliveryAddress: { type: String, required: true },
+    timeline: [
+      {
+        status: { type: String },
+        timestamp: { type: Date, default: Date.now },
+      },
+    ],
     deliveredAt: { type: Date },
   },
   { timestamps: true }

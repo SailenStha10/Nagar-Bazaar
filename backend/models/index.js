@@ -1,0 +1,13 @@
+require('./User');
+require('./Seller');
+require('./Category');
+require('./Product');
+require('./Cart');
+require('./CartItem');
+require('./Order');
+require('./OrderItem');
+require('./Complaint');
+require('./GovernmentOfficer');
+require('./GovernmentNotice');
+require('./MarketPrice');
+require('./Review');
