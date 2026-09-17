@@ -21,6 +21,7 @@ app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/seed', require('./routes/seedRoutes'));
 app.use('/api/cart', require('./routes/cartRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/sellers', require('./routes/sellerRoutes'));
 
 // 404 handler
 app.use((req, res) => {
