@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Seller = require('../models/Seller');
 const Product = require('../models/Product');
+const { asString } = require('../utils/sanitize');
 
 const formatSeller = async (seller) => ({
   _id: seller._id,
@@ -83,7 +84,7 @@ const getSellers = async (req, res) => {
     const limit = Math.max(parseInt(req.query.limit, 10) || 12, 1);
 
     const filter = {};
-    if (req.query.location) {
+    if (asString(req.query.location)) {
       filter.location = { $regex: req.query.location, $options: 'i' };
     }
     if (req.query.verified === 'true') {
@@ -101,6 +102,19 @@ const getSellers = async (req, res) => {
       data: await Promise.all(sellers.map(formatSeller)),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const getOwnSellerProfile = async (req, res) => {
+  try {
+    const seller = await Seller.findOne({ userId: req.user._id });
+    if (!seller) {
+      return res.status(404).json({ success: false, message: 'Seller profile not found' });
+    }
+
+    res.status(200).json({ success: true, data: await formatSeller(seller) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -136,4 +150,4 @@ const updateSellerProfile = async (req, res) => {
   }
 };
 
-module.exports = { registerSeller, getSellerById, getSellers, updateSellerProfile };
+module.exports = { registerSeller, getSellerById, getSellers, getOwnSellerProfile, updateSellerProfile };

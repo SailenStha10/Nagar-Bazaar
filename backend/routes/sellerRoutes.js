@@ -4,6 +4,7 @@ const {
   registerSeller,
   getSellerById,
   getSellers,
+  getOwnSellerProfile,
   updateSellerProfile,
 } = require('../controllers/sellerController');
 const {
@@ -44,6 +45,8 @@ router.post(
   registerSeller
 );
 
+router.get('/profile', protect, authorize(['seller']), getOwnSellerProfile);
+
 router.put(
   '/profile',
   protect,
@@ -68,6 +71,8 @@ const productValidation = [
   body('image').optional().isString(),
   body('isLocal').optional().isBoolean(),
   body('localProductDetails').optional().isObject(),
+  body('discountType').optional().isIn(['none', 'percentage', 'flat']).withMessage('Invalid discount type'),
+  body('discountValue').optional().isFloat({ min: 0 }).withMessage('Discount value must be a non-negative number'),
 ];
 
 router.post('/products', protect, authorize(['seller']), productValidation, validate, addSellerProduct);
@@ -86,6 +91,8 @@ router.put(
     body('image').optional().isString(),
     body('isLocal').optional().isBoolean(),
     body('localProductDetails').optional().isObject(),
+    body('discountType').optional().isIn(['none', 'percentage', 'flat']).withMessage('Invalid discount type'),
+    body('discountValue').optional().isFloat({ min: 0 }).withMessage('Discount value must be a non-negative number'),
   ],
   validate,
   updateSellerProduct

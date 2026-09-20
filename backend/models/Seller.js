@@ -19,11 +19,24 @@ const sellerSchema = new mongoose.Schema(
     },
     verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'GovernmentOfficer' },
     verificationDate: { type: Date },
+    rejectionReason: { type: String },
+    reviewReason: { type: String },
+    verificationHistory: [
+      {
+        status: { type: String, enum: ['pending', 'approved', 'rejected', 'review_required'] },
+        date: { type: Date, default: Date.now },
+        reason: { type: String },
+        officerId: { type: mongoose.Schema.Types.ObjectId, ref: 'GovernmentOfficer' },
+      },
+    ],
     banner: { type: String },
     ratings: { type: Number, default: 0 },
     totalOrders: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
+
+sellerSchema.index({ userId: 1 });
+sellerSchema.index({ verificationStatus: 1 });
 
 module.exports = mongoose.model('Seller', sellerSchema);

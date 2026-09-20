@@ -9,11 +9,13 @@ import {
   Package,
   Star,
   AlertTriangle,
-  Plus,
-  ClipboardList,
   Store,
-  BarChart3,
   ArrowRight,
+  TrendingUp,
+  TrendingDown,
+  Trophy,
+  ShieldCheck,
+  Clock,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -23,6 +25,11 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import api from '@/utils/api';
 import useAuth from '@/hooks/useAuth';
@@ -42,6 +49,8 @@ const verificationBadge = {
   review_required: { label: 'Review Required', style: 'bg-accent-light text-accent-dark' },
   rejected: { label: 'Verification Rejected', style: 'bg-surface-alt text-ink-muted' },
 };
+
+const CATEGORY_COLORS = ['#0f2c4c', '#c1712f', '#3e7c59', '#9c5320', '#1e4d7b', '#5c6577', '#e6d9c3'];
 
 function SellerRegistrationForm({ onRegistered }) {
   const [form, setForm] = useState({ shopName: '', description: '', location: '', contact: '' });
@@ -137,6 +146,7 @@ export default function SellerDashboard() {
   const [loading, setLoading] = useState(true);
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [error, setError] = useState('');
+  const [categoryBreakdown, setCategoryBreakdown] = useState([]);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'seller')) {
@@ -165,12 +175,30 @@ export default function SellerDashboard() {
     if (user?.role === 'seller') loadDashboard();
   }, [user]);
 
+  // Category-wise product count for the donut below the main chart —
+  // computed from the seller's own catalog, not fabricated.
+  useEffect(() => {
+    if (user?.role !== 'seller') return;
+    api
+      .get('/sellers/products', { params: { limit: 100 } })
+      .then((res) => {
+        const products = res.data.data || [];
+        const counts = new Map();
+        products.forEach((p) => {
+          const name = p.categoryId?.name || 'Uncategorized';
+          counts.set(name, (counts.get(name) || 0) + 1);
+        });
+        setCategoryBreakdown([...counts.entries()].map(([name, count]) => ({ name, count })));
+      })
+      .catch(() => setCategoryBreakdown([]));
+  }, [user]);
+
   if (!user || user.role !== 'seller' || loading) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10">
         <div className="h-8 w-64 animate-pulse rounded bg-surface-alt" />
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-28 animate-pulse rounded-2xl border border-border bg-surface-raised" />
           ))}
         </div>
@@ -191,6 +219,7 @@ export default function SellerDashboard() {
   }
 
   const badge = verificationBadge[data.verificationStatus] || verificationBadge.pending;
+  const ratingPercent = data.averageRating > 0 ? Math.round((data.averageRating / 5) * 100) : 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -203,19 +232,159 @@ export default function SellerDashboard() {
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge.style}`}>{badge.label}</span>
           </div>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/seller/products/new" className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
+            Add Product
+          </Link>
+          <Link href="/seller/orders" className="rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-ink hover:border-primary hover:text-primary">
+            View Orders
+          </Link>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <DashboardStatCard title="Total Sales" value={`NPR ${data.totalSales.toLocaleString('en-NP')}`} icon={Wallet} color="primary" />
-        <DashboardStatCard title="Total Orders" value={data.totalOrders} icon={ShoppingBag} color="accent" />
-        <DashboardStatCard title="Total Products" value={data.totalProducts} icon={Package} color="local" />
-        <DashboardStatCard
-          title="Average Rating"
-          value={data.averageRating > 0 ? `${data.averageRating} ★` : 'No ratings yet'}
-          icon={Star}
-          color="accent"
-        />
+      {/* Compact stat grid (left) + big sales chart (right), like the reference dashboard */}
+      <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.4fr]">
+        <div className="grid grid-cols-2 gap-5">
+          <DashboardStatCard title="Sales This Month" value={`NPR ${data.thisMonthSales.toLocaleString('en-NP')}`} icon={Wallet} color="primary" />
+          <DashboardStatCard title="Orders This Month" value={data.thisMonthOrders} icon={ShoppingBag} color="accent" />
+          <DashboardStatCard title="Total Products" value={data.totalProducts} icon={Package} color="local" />
+          <DashboardStatCard title="Low Stock Alerts" value={data.lowStockCount} icon={AlertTriangle} color="accent" />
+        </div>
+
+        <div id="sales-chart" className="rounded-2xl border border-border bg-surface-raised p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-semibold text-ink">Sales — Last 30 Days</h2>
+            {data.salesGrowthPercent !== null && (
+              <span className={`flex items-center gap-1 text-sm font-semibold ${data.salesGrowthPercent >= 0 ? 'text-local' : 'text-accent-dark'}`}>
+                {data.salesGrowthPercent >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+                {data.salesGrowthPercent >= 0 ? '+' : ''}
+                {data.salesGrowthPercent}% vs last month
+              </span>
+            )}
+          </div>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.salesLast30Days}>
+                <defs>
+                  <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0f2c4c" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#0f2c4c" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e6e0d2" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  tick={{ fontSize: 11, fill: '#5c6577' }}
+                  axisLine={{ stroke: '#e6e0d2' }}
+                  tickLine={false}
+                  interval={3}
+                />
+                <YAxis tick={{ fontSize: 12, fill: '#5c6577' }} axisLine={false} tickLine={false} width={40} />
+                <Tooltip
+                  formatter={(value) => [`NPR ${value.toLocaleString('en-NP')}`, 'Sales']}
+                  labelFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  contentStyle={{ borderRadius: 12, border: '1px solid #e6e0d2', fontSize: 13 }}
+                />
+                <Area type="monotone" dataKey="sales" stroke="#0f2c4c" strokeWidth={2} fill="url(#salesGradient)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Category breakdown donut + rating ring */}
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-surface-raised p-6">
+          <h2 className="font-display text-base font-semibold text-ink">Category Wise Product Count</h2>
+          {categoryBreakdown.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-muted">Add products to see a category breakdown.</p>
+          ) : (
+            <div className="mt-4 flex items-center gap-6">
+              <div className="h-44 w-44 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={categoryBreakdown} dataKey="count" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={2}>
+                      {categoryBreakdown.map((entry, i) => (
+                        <Cell key={entry.name} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e6e0d2', fontSize: 13 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 text-xs">
+                {categoryBreakdown.map((entry, i) => (
+                  <span key={entry.name} className="flex items-center gap-1.5 text-ink-muted">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
+                    {entry.name} ({entry.count})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface-raised p-6">
+          <h2 className="font-display text-base font-semibold text-ink">Average Rating</h2>
+          <div className="mt-2 flex items-center gap-6">
+            <div className="relative h-36 w-36 shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[{ value: ratingPercent }, { value: 100 - ratingPercent }]}
+                    dataKey="value"
+                    innerRadius={48}
+                    outerRadius={64}
+                    startAngle={90}
+                    endAngle={-270}
+                    stroke="none"
+                  >
+                    <Cell fill="#c1712f" />
+                    <Cell fill="#f4efe4" />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-display text-2xl font-semibold text-ink">
+                  {data.averageRating > 0 ? data.averageRating : '—'}
+                </span>
+                {data.averageRating > 0 && <Star size={13} className="fill-accent text-accent" />}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-ink-muted">
+                {data.averageRating > 0
+                  ? `Your storefront rates ${ratingPercent}% of the maximum 5-star score.`
+                  : 'No customer ratings yet — they will appear here once orders are reviewed.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sales summary */}
+      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-surface-raised p-5">
+          <p className="text-xs text-ink-muted">Today&apos;s Sales</p>
+          <p className="mt-1.5 font-display text-2xl font-semibold text-ink">NPR {data.todaySales.toLocaleString('en-NP')}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface-raised p-5">
+          <p className="text-xs text-ink-muted">Last Month</p>
+          <p className="mt-1.5 font-display text-2xl font-semibold text-ink">NPR {data.lastMonthSales.toLocaleString('en-NP')}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface-raised p-5">
+          <p className="text-xs text-ink-muted">Month-over-Month Growth</p>
+          {data.salesGrowthPercent === null ? (
+            <p className="mt-1.5 font-display text-2xl font-semibold text-ink-muted">—</p>
+          ) : (
+            <p className={`mt-1.5 flex items-center gap-1.5 font-display text-2xl font-semibold ${data.salesGrowthPercent >= 0 ? 'text-local' : 'text-accent-dark'}`}>
+              {data.salesGrowthPercent >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+              {data.salesGrowthPercent >= 0 ? '+' : ''}
+              {data.salesGrowthPercent}%
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
@@ -270,36 +439,50 @@ export default function SellerDashboard() {
             )}
           </div>
 
-          {/* Sales chart */}
-          <div id="sales-chart" className="rounded-2xl border border-border bg-surface-raised p-6">
-            <h2 className="font-display text-lg font-semibold text-ink">Sales — Last 7 Days</h2>
-            <div className="mt-4 h-64">
+          {/* Orders by status */}
+          <div className="rounded-2xl border border-border bg-surface-raised p-6">
+            <h2 className="font-display text-lg font-semibold text-ink">Orders by Status</h2>
+            <div className="mt-4 h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.salesLast7Days}>
-                  <defs>
-                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0f2c4c" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#0f2c4c" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={data.ordersByStatus}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e6e0d2" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { weekday: 'short' })}
-                    tick={{ fontSize: 12, fill: '#5c6577' }}
-                    axisLine={{ stroke: '#e6e0d2' }}
-                    tickLine={false}
-                  />
-                  <YAxis tick={{ fontSize: 12, fill: '#5c6577' }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip
-                    formatter={(value) => [`NPR ${value.toLocaleString('en-NP')}`, 'Sales']}
-                    labelFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    contentStyle={{ borderRadius: 12, border: '1px solid #e6e0d2', fontSize: 13 }}
-                  />
-                  <Area type="monotone" dataKey="sales" stroke="#0f2c4c" strokeWidth={2} fill="url(#salesGradient)" />
-                </AreaChart>
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#5c6577' }} axisLine={{ stroke: '#e6e0d2' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: '#5c6577' }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e6e0d2', fontSize: 13 }} />
+                  <Bar dataKey="count" fill="#c1712f" radius={[6, 6, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
+          </div>
+
+          {/* Top products */}
+          <div className="rounded-2xl border border-border bg-surface-raised p-6">
+            <div className="flex items-center gap-2">
+              <Trophy size={17} className="text-accent-dark" />
+              <h2 className="font-display text-lg font-semibold text-ink">Top Products</h2>
+            </div>
+            {data.topProducts.length === 0 ? (
+              <p className="mt-4 text-sm text-ink-muted">No sales yet.</p>
+            ) : (
+              <div className="mt-4 divide-y divide-border">
+                {data.topProducts.map((p, i) => (
+                  <div key={p.productId} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-alt text-xs font-semibold text-ink-muted">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-ink">{p.name}</p>
+                        <p className="text-xs text-ink-muted">
+                          {p.salesCount} sold {p.rating > 0 ? `· ${p.rating} ★` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold text-primary">NPR {p.revenue.toLocaleString('en-NP')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -316,7 +499,10 @@ export default function SellerDashboard() {
               <ul className="mt-4 space-y-2.5">
                 {data.lowStockProducts.map((p) => (
                   <li key={p._id} className="flex items-center justify-between text-sm">
-                    <span className="text-ink">{p.name}</span>
+                    <div>
+                      <span className="text-ink">{p.name}</span>
+                      {p.categoryId?.name && <span className="ml-1.5 text-xs text-ink-muted">({p.categoryId.name})</span>}
+                    </div>
                     <span className="font-semibold text-accent-dark">{p.stock} left</span>
                   </li>
                 ))}
@@ -331,39 +517,41 @@ export default function SellerDashboard() {
             </Link>
           </div>
 
-          {/* Quick actions */}
+          {/* Account status */}
           <div className="rounded-2xl border border-border bg-surface-raised p-6">
-            <h2 className="font-display text-base font-semibold text-ink">Quick Actions</h2>
-            <div className="mt-4 space-y-2.5">
-              <Link
-                href="/seller/products/new"
-                className="flex items-center gap-2.5 rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-              >
-                <Plus size={15} />
-                Add Product
-              </Link>
-              <Link
-                href="/seller/orders"
-                className="flex items-center gap-2.5 rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-              >
-                <ClipboardList size={15} />
-                View All Orders
-              </Link>
-              <Link
-                href="/seller/store"
-                className="flex items-center gap-2.5 rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-              >
-                <Store size={15} />
-                Manage Store
-              </Link>
-              <a
-                href="#sales-chart"
-                className="flex items-center gap-2.5 rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-              >
-                <BarChart3 size={15} />
-                View Analytics
-              </a>
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={17} className="text-primary" />
+              <h2 className="font-display text-base font-semibold text-ink">Account Status</h2>
             </div>
+            <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge.style}`}>{badge.label}</span>
+
+            {data.verificationStatus === 'rejected' && data.rejectionReason && (
+              <p className="mt-3 text-sm text-ink-muted">Reason: {data.rejectionReason}</p>
+            )}
+            {data.verificationStatus === 'review_required' && data.reviewReason && (
+              <p className="mt-3 text-sm text-ink-muted">Needs: {data.reviewReason}</p>
+            )}
+
+            {data.verificationHistory?.length > 0 && (
+              <div className="mt-4 space-y-3 border-t border-border pt-4">
+                {data.verificationHistory
+                  .slice()
+                  .reverse()
+                  .slice(0, 4)
+                  .map((h, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <Clock size={13} className="mt-0.5 shrink-0 text-ink-muted" />
+                      <div>
+                        <p className="text-xs font-semibold capitalize text-ink">{h.status.replace('_', ' ')}</p>
+                        <p className="text-xs text-ink-muted">
+                          {new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {h.officerName ? ` · ${h.officerName}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

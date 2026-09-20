@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import api from '@/utils/api';
+import { computeDiscount } from '@/utils/discount';
 
 const sortOptions = [
   { value: 'createdAt-desc', label: 'Newest First' },
@@ -203,7 +204,9 @@ export default function SellerProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {products.map((product) => (
+                  {products.map((product) => {
+                    const { discountPercent, discountedPrice } = computeDiscount(product);
+                    return (
                     <tr key={product._id} className={deletingId === product._id ? 'opacity-50' : ''}>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
@@ -214,7 +217,19 @@ export default function SellerProductsPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3 text-ink-muted">{product.categoryId?.name || '—'}</td>
-                      <td className="px-5 py-3 text-ink-muted">NPR {product.price.toLocaleString('en-NP')}</td>
+                      <td className="px-5 py-3 text-ink-muted">
+                        {discountPercent > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-local">NPR {discountedPrice.toLocaleString('en-NP')}</span>
+                            <span className="text-xs text-ink-muted line-through">NPR {product.price.toLocaleString('en-NP')}</span>
+                            <span className="rounded-full bg-local-light px-2 py-0.5 text-[10px] font-semibold text-local">
+                              -{discountPercent}%
+                            </span>
+                          </div>
+                        ) : (
+                          `NPR ${product.price.toLocaleString('en-NP')}`
+                        )}
+                      </td>
                       <td className="px-5 py-3 text-ink-muted">{product.stock}</td>
                       <td className="px-5 py-3">
                         <span
@@ -252,14 +267,17 @@ export default function SellerProductsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile cards */}
             <div className="space-y-3 md:hidden">
-              {products.map((product) => (
+              {products.map((product) => {
+                const { discountPercent, discountedPrice } = computeDiscount(product);
+                return (
                 <div
                   key={product._id}
                   className={`rounded-2xl border border-border bg-surface-raised p-4 ${
@@ -284,7 +302,14 @@ export default function SellerProductsPage() {
                   </div>
 
                   <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-primary">NPR {product.price.toLocaleString('en-NP')}</span>
+                    {discountPercent > 0 ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-semibold text-local">NPR {discountedPrice.toLocaleString('en-NP')}</span>
+                        <span className="text-xs text-ink-muted line-through">NPR {product.price.toLocaleString('en-NP')}</span>
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-primary">NPR {product.price.toLocaleString('en-NP')}</span>
+                    )}
                     <span className="text-ink-muted">Stock: {product.stock}</span>
                     <span className="flex items-center gap-1 text-ink-muted">
                       <Star size={12} className="fill-accent text-accent" />
@@ -309,7 +334,8 @@ export default function SellerProductsPage() {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {pagination.pages > 1 && (

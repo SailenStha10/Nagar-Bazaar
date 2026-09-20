@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldCheck, Leaf, MessageSquareWarning } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
+import { dashboardPathForRole } from '@/utils/roles';
 
 const highlights = [
   { icon: ShieldCheck, text: 'Shop from officer-verified local sellers' },
@@ -34,7 +35,7 @@ export default function LoginPage() {
 
     try {
       const user = await login(form.email, form.password);
-      router.push(`/${user.role}/dashboard`);
+      router.push(dashboardPathForRole(user.role));
     } catch {
       // error state handled by useAuth
     }

@@ -11,4 +11,6 @@ const governmentOfficerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+governmentOfficerSchema.index({ userId: 1 });
+
 module.exports = mongoose.model('GovernmentOfficer', governmentOfficerSchema);

@@ -9,6 +9,8 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, min: 0 },
     image: { type: String },
+    discountType: { type: String, enum: ['none', 'percentage', 'flat'], default: 'none' },
+    discountValue: { type: Number, default: 0, min: 0 },
     isLocal: { type: Boolean, default: false },
     localProductDetails: {
       producer: { type: String },
@@ -19,5 +21,10 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+productSchema.index({ sellerId: 1 });
+productSchema.index({ categoryId: 1, isActive: 1 });
+productSchema.index({ isActive: 1, name: 1 });
+productSchema.index({ isActive: 1, isLocal: 1 });
 
 module.exports = mongoose.model('Product', productSchema);

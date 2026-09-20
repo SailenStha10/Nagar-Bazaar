@@ -6,6 +6,7 @@ const complaintSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller' },
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    relatedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
     category: {
       type: String,
       enum: [
@@ -41,5 +42,10 @@ const complaintSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+complaintSchema.index({ userId: 1, createdAt: -1 });
+complaintSchema.index({ assignedOfficer: 1, status: 1 });
+complaintSchema.index({ status: 1 });
+complaintSchema.index({ sellerId: 1 });
 
 module.exports = mongoose.model('Complaint', complaintSchema);

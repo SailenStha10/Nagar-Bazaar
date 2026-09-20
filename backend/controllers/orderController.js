@@ -93,8 +93,6 @@ const checkout = async (req, res) => {
     cart.totalPrice = 0;
     await cart.save();
 
-    console.log(`[mock email] Order confirmation for ${orderNumber} sent to ${req.user.email}`);
-
     const populatedItems = await OrderItem.find({ orderId: order._id })
       .populate('productId', 'name price image')
       .populate('sellerId', 'shopName contact');

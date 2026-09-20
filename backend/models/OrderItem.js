@@ -11,4 +11,8 @@ const orderItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+orderItemSchema.index({ orderId: 1 });
+orderItemSchema.index({ sellerId: 1, createdAt: -1 });
+orderItemSchema.index({ productId: 1 });
+
 module.exports = mongoose.model('OrderItem', orderItemSchema);

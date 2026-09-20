@@ -15,6 +15,8 @@ const emptyForm = {
   isLocal: false,
   producer: '',
   location: '',
+  discountType: 'none',
+  discountValue: '',
 };
 
 export default function SellerProductForm({ initialValues, onSubmit, onDelete, submitLabel = 'Save Product' }) {
@@ -44,6 +46,8 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
         isLocal: Boolean(initialValues.isLocal),
         producer: initialValues.localProductDetails?.producer || '',
         location: initialValues.localProductDetails?.location || '',
+        discountType: initialValues.discountType || 'none',
+        discountValue: initialValues.discountValue ? String(initialValues.discountValue) : '',
       });
     }
   }, [initialValues]);
@@ -62,6 +66,16 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
     if (form.isLocal) {
       if (!form.producer.trim()) next.producer = 'Producer name is required for local products';
       if (!form.location.trim()) next.location = 'Location is required for local products';
+    }
+    if (form.discountType !== 'none') {
+      const value = Number(form.discountValue);
+      if (form.discountValue === '' || value <= 0) {
+        next.discountValue = 'Enter a discount value greater than 0';
+      } else if (form.discountType === 'percentage' && value > 100) {
+        next.discountValue = 'Percentage cannot exceed 100';
+      } else if (form.discountType === 'flat' && form.price !== '' && value >= Number(form.price)) {
+        next.discountValue = 'Discounted price must be less than the regular price';
+      }
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -83,6 +97,8 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
       localProductDetails: form.isLocal
         ? { producer: form.producer.trim(), location: form.location.trim() }
         : undefined,
+      discountType: form.discountType,
+      discountValue: form.discountType === 'none' ? 0 : Number(form.discountValue),
     };
 
     setSubmitting(true);
@@ -192,6 +208,61 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
               />
               {errors.stock && <p className="mt-1 text-xs text-accent-dark">{errors.stock}</p>}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-border p-4">
+            <p className="text-sm font-medium text-ink">Sale / Discount</p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Only products with a discount set here appear in the customer &ldquo;Sale &amp; Discounted&rdquo; section.
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-ink-muted">Discount Type</label>
+                <select
+                  name="discountType"
+                  value={form.discountType}
+                  onChange={handleChange}
+                  className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                >
+                  <option value="none">No discount</option>
+                  <option value="percentage">Percentage off</option>
+                  <option value="flat">Flat sale price</option>
+                </select>
+              </div>
+              {form.discountType !== 'none' && (
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted">
+                    {form.discountType === 'percentage' ? 'Percentage (%)' : 'Sale Price (NPR)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step={form.discountType === 'percentage' ? '1' : '0.01'}
+                    max={form.discountType === 'percentage' ? '100' : undefined}
+                    name="discountValue"
+                    value={form.discountValue}
+                    onChange={handleChange}
+                    className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  {errors.discountValue && <p className="mt-1 text-xs text-accent-dark">{errors.discountValue}</p>}
+                </div>
+              )}
+            </div>
+
+            {form.discountType !== 'none' && form.price !== '' && form.discountValue !== '' && !errors.discountValue && (
+              <p className="mt-3 text-sm text-ink">
+                Customers will see{' '}
+                <span className="font-semibold text-local">
+                  NPR{' '}
+                  {(form.discountType === 'percentage'
+                    ? Number(form.price) * (1 - Number(form.discountValue) / 100)
+                    : Number(form.discountValue)
+                  ).toLocaleString('en-NP', { maximumFractionDigits: 2 })}
+                </span>{' '}
+                <span className="text-ink-muted line-through">NPR {Number(form.price).toLocaleString('en-NP')}</span>
+              </p>
+            )}
           </div>
 
           <div className="rounded-xl border border-border p-4">

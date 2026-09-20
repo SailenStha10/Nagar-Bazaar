@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, SlidersHorizontal, PackageSearch } from 'lucide-react';
 import api from '@/utils/api';
@@ -95,19 +95,22 @@ export default function ProductsPage() {
     setSearchInput('');
   };
 
-  const handleAddToCart = async (product) => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    try {
-      await addToCart(product._id, 1);
-      setToast(`${product.name} added to cart`);
-    } catch (err) {
-      setToast(err.response?.data?.message || 'Could not add to cart');
-    }
-    setTimeout(() => setToast(''), 2500);
-  };
+  const handleAddToCart = useCallback(
+    async (product) => {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      try {
+        await addToCart(product._id, 1);
+        setToast(`${product.name} added to cart`);
+      } catch (err) {
+        setToast(err.response?.data?.message || 'Could not add to cart');
+      }
+      setTimeout(() => setToast(''), 2500);
+    },
+    [user, router, addToCart]
+  );
 
   const hasActiveFilters =
     filters.category || filters.minPrice || filters.maxPrice || filters.inStockOnly || searchInput;
@@ -310,7 +313,7 @@ export default function ProductsPage() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-white shadow-xl">
+        <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-white shadow-xl">
           {toast}
         </div>
       )}

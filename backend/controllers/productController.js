@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Review = require('../models/Review');
+const { asString } = require('../utils/sanitize');
+const { computeDiscount } = require('../utils/discount');
 
 const SORT_FIELDS = {
   name: 'name',
@@ -28,6 +30,7 @@ const formatListItem = (product) => ({
   isLocal: product.isLocal,
   localProductDetails: product.isLocal ? product.localProductDetails : undefined,
   seller: formatSeller(product.sellerId),
+  ...computeDiscount(product),
 });
 
 const buildListQuery = async (req, res, extraFilter = {}) => {
@@ -62,12 +65,17 @@ const buildListQuery = async (req, res, extraFilter = {}) => {
     filter.isLocal = true;
   }
 
-  if (req.query.location) {
+  if (asString(req.query.location)) {
     filter['localProductDetails.location'] = req.query.location;
   }
 
-  if (req.query.producer) {
+  if (asString(req.query.producer)) {
     filter['localProductDetails.producer'] = req.query.producer;
+  }
+
+  if (req.query.onSale === 'true') {
+    filter.discountType = { $ne: 'none' };
+    filter.discountValue = { $gt: 0 };
   }
 
   const total = await Product.countDocuments(filter);
@@ -119,6 +127,7 @@ const getProductById = async (req, res) => {
         name: product.name,
         description: product.description,
         price: product.price,
+        ...computeDiscount(product),
         stock: product.stock,
         image: product.image,
         category: product.categoryId
@@ -145,7 +154,7 @@ const searchProducts = async (req, res) => {
   try {
     const filter = {};
 
-    if (req.query.q) {
+    if (asString(req.query.q)) {
       filter.name = { $regex: req.query.q, $options: 'i' };
     }
 

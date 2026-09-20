@@ -26,6 +26,13 @@ const customerDefs = [
   { name: 'Deepa Karki', email: 'deepa.karki@example.com', phone: '9812000005', address: 'Suryabinayak, Bhaktapur' },
 ];
 
+const adminDef = {
+  name: 'System Admin',
+  email: 'admin1@gmail.com',
+  password: 'admin123',
+  phone: '9800000000',
+};
+
 const officerDef = {
   name: 'Officer Bimal Basnet',
   email: 'bimal.basnet@nagarbazaar.example',
@@ -187,6 +194,15 @@ const seedDatabase = async () => {
     });
     customers.push(user);
   }
+
+  // System admin
+  await User.create({
+    name: adminDef.name,
+    email: adminDef.email,
+    password: await hashPassword(adminDef.password),
+    phone: adminDef.phone,
+    role: 'admin',
+  });
 
   // Government officer (needed to issue notices / monitor prices)
   const officerUser = await User.create({

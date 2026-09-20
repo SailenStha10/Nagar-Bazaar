@@ -14,8 +14,12 @@ const governmentNoticeSchema = new mongoose.Schema(
     archiveAt: { type: Date },
     isArchived: { type: Boolean, default: false },
     priority: { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
+    viewCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
+
+governmentNoticeSchema.index({ isArchived: 1, publishedAt: -1 });
+governmentNoticeSchema.index({ category: 1 });
 
 module.exports = mongoose.model('GovernmentNotice', governmentNoticeSchema);

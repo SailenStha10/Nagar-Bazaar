@@ -6,7 +6,7 @@ const colorMap = {
 
 export default function DashboardStatCard({ title, value, icon: Icon, trend, color = 'primary' }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface-raised p-5">
+    <div className="rounded-2xl border border-border bg-surface-raised p-5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-center justify-between">
         <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${colorMap[color] || colorMap.primary}`}>
           {Icon && <Icon size={18} />}

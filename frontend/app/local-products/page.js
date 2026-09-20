@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Leaf, MapPin, ShieldCheck, Sprout, PackageSearch } from 'lucide-react';
 import api from '@/utils/api';
 import LocalProductCard from '@/components/LocalProductCard';
+import ScrollReveal from '@/components/ScrollReveal';
 import useAuth from '@/hooks/useAuth';
 import useCart from '@/hooks/useCart';
 
@@ -281,29 +282,31 @@ export default function LocalProductsPage() {
       {/* About */}
       <section className="bg-surface-alt px-4 py-16">
         <div className="mx-auto max-w-7xl">
-          <div className="mx-auto max-w-2xl text-center">
+          <ScrollReveal direction="fade" className="mx-auto max-w-2xl text-center">
             <span className="text-xs font-semibold uppercase tracking-widest text-local">About Local Products</span>
             <h2 className="mt-3 font-display text-3xl font-semibold text-ink">
               Why buy local on Nagar Bazaar?
             </h2>
-          </div>
+          </ScrollReveal>
 
           <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {aboutPoints.map((point) => (
-              <div key={point.title} className="rounded-2xl border border-border bg-surface-raised p-6">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-local-light text-local">
-                  <point.icon size={20} />
+            {aboutPoints.map((point, i) => (
+              <ScrollReveal key={point.title} direction={i % 2 === 0 ? 'left' : 'right'} delay={i * 70}>
+                <div className="rounded-2xl border border-border bg-surface-raised p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-local-light text-local">
+                    <point.icon size={20} />
+                  </div>
+                  <h3 className="mt-4 font-display text-lg font-semibold text-ink">{point.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">{point.description}</p>
                 </div>
-                <h3 className="mt-4 font-display text-lg font-semibold text-ink">{point.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{point.description}</p>
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </div>
       </section>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-white shadow-xl">
+        <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-white shadow-xl">
           {toast}
         </div>
       )}

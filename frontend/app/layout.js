@@ -1,17 +1,18 @@
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import RouteProgressBar from "@/components/RouteProgressBar";
+import SplashScreen from "@/components/SplashScreen";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { WishlistProvider } from "@/context/WishlistContext";
+import { MarketplaceFiltersProvider } from "@/context/MarketplaceFiltersContext";
 
-const fraunces = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-  axes: ["opsz", "SOFT", "WONK"],
-});
-
-const jakarta = Plus_Jakarta_Sans({
+// A single system-wide font (closest match to the brand's UI typeface) used
+// for both body copy and display headings — see --font-display alias in
+// globals.css, which points it at this same variable.
+const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
 });
@@ -24,16 +25,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html
-      lang="en"
-      className={`${fraunces.variable} ${jakarta.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-surface font-sans text-ink">
         <AuthProvider>
           <CartProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
+            <WishlistProvider>
+              <MarketplaceFiltersProvider>
+                <SplashScreen />
+                <RouteProgressBar />
+                <Navbar />
+                <main className="flex-1 pt-20">{children}</main>
+                <Footer />
+              </MarketplaceFiltersProvider>
+            </WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </body>

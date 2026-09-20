@@ -10,4 +10,6 @@ const cartItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+cartItemSchema.index({ cartId: 1 });
+
 module.exports = mongoose.model('CartItem', cartItemSchema);

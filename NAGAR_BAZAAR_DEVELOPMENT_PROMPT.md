@@ -1,4 +1,4 @@
-# Nagar Bazaar – Integrated E-Commerce and E-Governance Platform
+ # Nagar Bazaar – Integrated E-Commerce and E-Governance Platform
 ## Complete Development Prompt & Sprint Guide
 
 **Project Type:** University Project  

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldCheck, Store, Users } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
+import { dashboardPathForRole } from '@/utils/roles';
 
 const highlights = [
   { icon: Users, text: 'Join as a citizen to shop and file complaints' },
@@ -57,7 +58,7 @@ export default function RegisterPage() {
         phone: form.phone,
         role: form.role,
       });
-      router.push(`/${user.role}/dashboard`);
+      router.push(dashboardPathForRole(user.role));
     } catch {
       // error state handled by useAuth
     }

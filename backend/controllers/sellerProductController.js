@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Seller = require('../models/Seller');
+const { asString } = require('../utils/sanitize');
 
 const SORT_FIELDS = ['name', 'price', 'stock', 'createdAt'];
 
@@ -10,6 +11,24 @@ const getSellerForUser = async (userId) => Seller.findOne({ userId });
 const buildLocalDetails = (isLocal, localProductDetails) =>
   isLocal ? localProductDetails || {} : undefined;
 
+// Cross-field discount validation lives here rather than in express-validator,
+// since it needs the product's (possibly not-yet-updated) price to check a
+// flat sale price actually undercuts it.
+const validateDiscount = (discountType, discountValue, price) => {
+  if (!discountType || discountType === 'none') return null;
+  const value = Number(discountValue);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 'Discount value must be a positive number';
+  }
+  if (discountType === 'percentage' && value > 100) {
+    return 'Discount percentage cannot exceed 100';
+  }
+  if (discountType === 'flat' && value >= price) {
+    return 'Discounted price must be less than the regular price';
+  }
+  return null;
+};
+
 const addSellerProduct = async (req, res) => {
   try {
     const seller = await getSellerForUser(req.user._id);
@@ -17,7 +36,7 @@ const addSellerProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Seller profile not found. Please register as a seller first.' });
     }
 
-    const { name, description, categoryId, price, stock, image, isLocal, localProductDetails } = req.body;
+    const { name, description, categoryId, price, stock, image, isLocal, localProductDetails, discountType, discountValue } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       return res.status(400).json({ success: false, message: 'Invalid category' });
@@ -25,6 +44,11 @@ const addSellerProduct = async (req, res) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       return res.status(400).json({ success: false, message: 'Category not found' });
+    }
+
+    const discountError = validateDiscount(discountType, discountValue, Number(price));
+    if (discountError) {
+      return res.status(400).json({ success: false, message: discountError });
     }
 
     const product = await Product.create({
@@ -35,6 +59,8 @@ const addSellerProduct = async (req, res) => {
       price,
       stock,
       image,
+      discountType: discountType && discountType !== 'none' ? discountType : 'none',
+      discountValue: discountType && discountType !== 'none' ? Number(discountValue) : 0,
       isLocal: Boolean(isLocal),
       localProductDetails: buildLocalDetails(isLocal, localProductDetails),
     });
@@ -58,7 +84,7 @@ const getSellerProducts = async (req, res) => {
     const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
 
     const filter = { sellerId: seller._id };
-    if (req.query.q) {
+    if (asString(req.query.q)) {
       filter.name = { $regex: req.query.q, $options: 'i' };
     }
     if (req.query.category && mongoose.Types.ObjectId.isValid(req.query.category)) {
@@ -122,7 +148,7 @@ const updateSellerProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    const { name, description, categoryId, price, stock, image, isLocal, localProductDetails } = req.body;
+    const { name, description, categoryId, price, stock, image, isLocal, localProductDetails, discountType, discountValue } = req.body;
 
     if (categoryId !== undefined) {
       if (!mongoose.Types.ObjectId.isValid(categoryId)) {
@@ -133,6 +159,18 @@ const updateSellerProduct = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Category not found' });
       }
       product.categoryId = categoryId;
+    }
+
+    if (discountType !== undefined || discountValue !== undefined || price !== undefined) {
+      const effectivePrice = price !== undefined ? Number(price) : product.price;
+      const effectiveType = discountType !== undefined ? discountType : product.discountType;
+      const effectiveValue = discountValue !== undefined ? discountValue : product.discountValue;
+      const discountError = validateDiscount(effectiveType, effectiveValue, effectivePrice);
+      if (discountError) {
+        return res.status(400).json({ success: false, message: discountError });
+      }
+      product.discountType = effectiveType && effectiveType !== 'none' ? effectiveType : 'none';
+      product.discountValue = effectiveType && effectiveType !== 'none' ? Number(effectiveValue) : 0;
     }
 
     if (name !== undefined) product.name = name;

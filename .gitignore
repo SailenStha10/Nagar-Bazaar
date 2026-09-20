@@ -15,6 +15,10 @@ frontend/out/
 dist/
 build/
 
+# Uploaded files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # Logs
 npm-debug.log*
 *.log
