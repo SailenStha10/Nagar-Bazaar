@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Cart = require('../models/Cart');
 const CartItem = require('../models/CartItem');
 const Product = require('../models/Product');
+const { computeDiscount } = require('../utils/discount');
 
 const getOrCreateCart = async (userId) => {
   let cart = await Cart.findOne({ userId });
@@ -25,19 +26,29 @@ const formatCart = async (cartId) => {
     path: 'items',
     populate: {
       path: 'productId',
-      select: 'name price image stock sellerId',
+      select: 'name price image stock sellerId discountType discountValue',
       populate: { path: 'sellerId', select: 'shopName' },
     },
   });
 
+  // The unit price is always recomputed from the product's *current*
+  // discount, not trusted from the cart item's stored price, so a seller
+  // changing/ending a discount is reflected immediately — the cart (and
+  // checkout, which uses this same formatCart output) never charges a
+  // stale price.
   const items = cart.items
     .filter((item) => item.productId)
-    .map((item) => ({
-      cartItemId: item._id,
-      product: item.productId,
-      quantity: item.quantity,
-      subtotal: item.price * item.quantity,
-    }));
+    .map((item) => {
+      const { discountPercent, discountedPrice } = computeDiscount(item.productId);
+      return {
+        cartItemId: item._id,
+        product: item.productId,
+        quantity: item.quantity,
+        price: discountedPrice,
+        discountPercent,
+        subtotal: discountedPrice * item.quantity,
+      };
+    });
 
   return {
     _id: cart._id,
@@ -83,16 +94,18 @@ const addToCart = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Out of stock' });
     }
 
+    const { discountedPrice } = computeDiscount(product);
+
     if (cartItem) {
       cartItem.quantity = desiredQuantity;
-      cartItem.price = product.price;
+      cartItem.price = discountedPrice;
       await cartItem.save();
     } else {
       cartItem = await CartItem.create({
         cartId: cart._id,
         productId,
         quantity: qty,
-        price: product.price,
+        price: discountedPrice,
       });
     }
 
@@ -133,6 +146,7 @@ const updateCartItem = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Out of stock' });
       }
       cartItem.quantity = qty;
+      cartItem.price = computeDiscount(product).discountedPrice;
       await cartItem.save();
     }
 

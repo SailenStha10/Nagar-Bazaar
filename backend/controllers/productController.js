@@ -3,6 +3,11 @@ const Product = require('../models/Product');
 const Review = require('../models/Review');
 const { asString } = require('../utils/sanitize');
 const { computeDiscount } = require('../utils/discount');
+const SearchRankingEngine = require('../algorithms/searchRanking');
+const FuzzyMatcher = require('../algorithms/fuzzyMatching');
+
+const rankingEngine = new SearchRankingEngine();
+const fuzzyMatcher = new FuzzyMatcher();
 
 const SORT_FIELDS = {
   name: 'name',
@@ -33,12 +38,9 @@ const formatListItem = (product) => ({
   ...computeDiscount(product),
 });
 
-const buildListQuery = async (req, res, extraFilter = {}) => {
-  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-  const limit = Math.max(parseInt(req.query.limit, 10) || 12, 1);
-  const sortBy = SORT_FIELDS[req.query.sortBy] || 'name';
-  const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
-
+// Builds the shared Product filter from query params. Returns null (and
+// writes the error response) on an invalid id, so callers can bail out.
+const buildFilter = (req, res, extraFilter = {}) => {
   const filter = { isActive: true, ...extraFilter };
 
   if (req.query.category) {
@@ -77,6 +79,18 @@ const buildListQuery = async (req, res, extraFilter = {}) => {
     filter.discountType = { $ne: 'none' };
     filter.discountValue = { $gt: 0 };
   }
+
+  return filter;
+};
+
+const buildListQuery = async (req, res, extraFilter = {}) => {
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.max(parseInt(req.query.limit, 10) || 12, 1);
+  const sortBy = SORT_FIELDS[req.query.sortBy] || 'name';
+  const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
+
+  const filter = buildFilter(req, res, extraFilter);
+  if (!filter) return null;
 
   const total = await Product.countDocuments(filter);
   const products = await Product.find(filter)
@@ -150,30 +164,99 @@ const getProductById = async (req, res) => {
   }
 };
 
+const MAX_RANKED_CANDIDATES = 300;
+
 const searchProducts = async (req, res) => {
   try {
-    const filter = {};
+    const q = asString(req.query.q);
+    const extraFilter = {};
 
-    if (asString(req.query.q)) {
-      filter.name = { $regex: req.query.q, $options: 'i' };
+    if (q) {
+      extraFilter.name = { $regex: q, $options: 'i' };
     }
 
     if (req.query.minPrice || req.query.maxPrice) {
-      filter.price = {};
-      if (req.query.minPrice) filter.price.$gte = Number(req.query.minPrice);
-      if (req.query.maxPrice) filter.price.$lte = Number(req.query.maxPrice);
+      extraFilter.price = {};
+      if (req.query.minPrice) extraFilter.price.$gte = Number(req.query.minPrice);
+      if (req.query.maxPrice) extraFilter.price.$lte = Number(req.query.maxPrice);
     }
 
     if (req.query.inStock === 'true') {
-      filter.stock = { $gt: 0 };
+      extraFilter.stock = { $gt: 0 };
     }
 
-    const result = await buildListQuery(req, res, filter);
-    if (!result) return;
-    res.status(200).json({ success: true, ...result });
+    // Without a search term there's nothing to rank against — fall back to
+    // the plain sortBy-based listing.
+    if (!q) {
+      const result = await buildListQuery(req, res, extraFilter);
+      if (!result) return;
+      return res.status(200).json({ success: true, ...result });
+    }
+
+    const filter = buildFilter(req, res, extraFilter);
+    if (!filter) return;
+
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit, 10) || 12, 1);
+
+    const candidates = await Product.find(filter)
+      .select('name description price createdAt')
+      .limit(MAX_RANKED_CANDIDATES)
+      .lean();
+
+    const ranked = await rankingEngine.rankProducts(q, candidates);
+    const total = ranked.length;
+    const pageSlice = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
+
+    const populated = await Product.find({ _id: { $in: pageSlice.map((r) => r.product._id) } })
+      .populate({ path: 'sellerId', select: 'shopName userId', populate: { path: 'userId', select: 'name' } });
+    const byId = new Map(populated.map((p) => [p._id.toString(), p]));
+
+    const data = pageSlice
+      .map((r) => {
+        const product = byId.get(r.product._id.toString());
+        return product ? { ...formatListItem(product), relevanceScore: r.scores.final } : null;
+      })
+      .filter(Boolean);
+
+    // No substring matches at all — the query might just be a typo, so look
+    // for a "did you mean" correction across every active product (not just
+    // the regex-filtered candidates, which is exactly what came up empty).
+    let suggestions = [];
+    if (total === 0) {
+      const corrections = await fuzzyMatcher.getCorrections(q, 5);
+      suggestions = corrections.suggestions;
+    }
+
+    res.status(200).json({
+      success: true,
+      data,
+      suggestions,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-module.exports = { getProducts, getProductById, searchProducts };
+/**
+ * GET /api/products/suggestions?q=
+ * Autocomplete: product names starting with the given prefix.
+ */
+const getSearchSuggestions = async (req, res) => {
+  try {
+    const prefix = asString(req.query.q);
+    const suggestions = await rankingEngine.getSearchSuggestions(prefix, 8);
+    res.status(200).json({ success: true, data: suggestions });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = {
+  getProducts,
+  getProductById,
+  searchProducts,
+  getSearchSuggestions,
+  formatListItem,
+};

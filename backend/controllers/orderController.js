@@ -5,6 +5,7 @@ const Cart = require('../models/Cart');
 const CartItem = require('../models/CartItem');
 const Product = require('../models/Product');
 const Seller = require('../models/Seller');
+const { computeDiscount } = require('../utils/discount');
 
 const ESTIMATED_DELIVERY_DAYS = 4;
 
@@ -53,8 +54,12 @@ const checkout = async (req, res) => {
       });
     }
 
+    // Charge whatever the product's discount currently computes to, not the
+    // raw catalog price — this is what the customer was shown in their cart,
+    // and previously got silently dropped here, charging full price instead.
+    const unitPrices = cartItems.map((item) => computeDiscount(item.productId).discountedPrice);
     const orderNumber = await generateOrderNumber();
-    const totalAmount = cartItems.reduce((sum, item) => sum + item.productId.price * item.quantity, 0);
+    const totalAmount = cartItems.reduce((sum, item, i) => sum + unitPrices[i] * item.quantity, 0);
 
     const order = await Order.create({
       userId: req.user._id,
@@ -69,11 +74,11 @@ const checkout = async (req, res) => {
     });
 
     const orderItems = await OrderItem.insertMany(
-      cartItems.map((item) => ({
+      cartItems.map((item, i) => ({
         orderId: order._id,
         productId: item.productId._id,
         quantity: item.quantity,
-        price: item.productId.price,
+        price: unitPrices[i],
         sellerId: item.productId.sellerId,
       }))
     );

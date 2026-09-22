@@ -1,5 +1,11 @@
 import DashboardShell from '@/components/DashboardShell';
+import GovernmentTopBar from '@/components/GovernmentTopBar';
 
 export default function GovernmentLayout({ children }) {
-  return <DashboardShell role="government">{children}</DashboardShell>;
+  return (
+    <>
+      <GovernmentTopBar />
+      <DashboardShell role="government">{children}</DashboardShell>
+    </>
+  );
 }

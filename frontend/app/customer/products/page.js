@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, Tag, LayoutGrid, Search, PackageSearch } from 'lucide-react';
+import { Sparkles, Tag, LayoutGrid, PackageSearch, ShoppingBag } from 'lucide-react';
 import api from '@/utils/api';
 import useAuth from '@/hooks/useAuth';
 import useCart from '@/hooks/useCart';
@@ -65,7 +65,10 @@ export default function CustomerProductsLanding() {
   const mf = useMarketplaceFilters();
 
   // Curated sections (sale, recommended) — rendered inside the Full
-  // Marketplace section below, not as a separate "For You" page/area.
+  // Marketplace section below, not as a separate "For You" page/area. Capped
+  // to 4 items each; "View All Sale Products" hands off to the All Products
+  // grid below instead of growing this section.
+  const CURATED_LIMIT = 4;
   const [recommended, setRecommended] = useState([]);
   const [sale, setSale] = useState([]);
   const [curatedLoading, setCuratedLoading] = useState(true);
@@ -80,6 +83,17 @@ export default function CustomerProductsLanding() {
   const [pagination, setPagination] = useState({ page: 1, limit: 12, total: 0, pages: 1 });
   const [marketLoading, setMarketLoading] = useState(true);
   const [marketError, setMarketError] = useState('');
+  const [saleOnly, setSaleOnly] = useState(false);
+
+  // Browsing (no search) is capped at 40 products so the catalog stays
+  // skimmable; a search still reaches the full catalog beyond that cap.
+  const ALL_PRODUCTS_CAP = 40;
+  const isCapped = !debouncedSearch && !saleOnly;
+  const cappedTotal = isCapped ? Math.min(pagination.total, ALL_PRODUCTS_CAP) : pagination.total;
+  const cappedPages = Math.ceil(cappedTotal / pagination.limit) || 1;
+  const visibleMarketProducts = isCapped
+    ? marketProducts.slice(0, Math.max(0, ALL_PRODUCTS_CAP - (page - 1) * pagination.limit))
+    : marketProducts;
 
   const filters = mf?.filters;
   const sort = mf?.sort;
@@ -98,17 +112,28 @@ export default function CustomerProductsLanding() {
     }
   }, [authLoading, user, router]);
 
+  // Recommended pulls from the real per-user recommendation engine (order
+  // history driven, see /api/recommendations), so it reflects what the
+  // customer has actually done and comes back fresh on every visit rather
+  // than a static "top rated" list. New customers with no order history yet
+  // get nothing back from that engine, so top-rated products fill in.
   useEffect(() => {
     if (!user || user.role !== 'customer') return;
     setCuratedLoading(true);
     setError('');
 
     Promise.all([
-      api.get('/products/search', { params: { page: 1, limit: 8, sortBy: 'rating', sortOrder: 'desc' } }),
-      api.get('/products/search', { params: { page: 1, limit: 8, onSale: true, sortBy: 'latest', sortOrder: 'desc' } }),
+      api.get(`/recommendations/${user.userId}`, { params: { limit: CURATED_LIMIT } }),
+      api.get('/products/search', { params: { page: 1, limit: CURATED_LIMIT, onSale: true, sortBy: 'latest', sortOrder: 'desc' } }),
     ])
-      .then(([ratedRes, saleRes]) => {
-        setRecommended(ratedRes.data.data || []);
+      .then(async ([recRes, saleRes]) => {
+        const recs = (recRes.data.data || []).map((r) => r.product).filter(Boolean);
+        if (recs.length > 0) {
+          setRecommended(recs);
+        } else {
+          const fallback = await api.get('/products/search', { params: { page: 1, limit: CURATED_LIMIT, sortBy: 'rating', sortOrder: 'desc' } });
+          setRecommended(fallback.data.data || []);
+        }
         setSale(saleRes.data.data || []);
       })
       .catch(() => setError('Failed to load products. Please try again.'))
@@ -142,6 +167,7 @@ export default function CustomerProductsLanding() {
     if (filters.minPrice) params.minPrice = filters.minPrice;
     if (filters.maxPrice) params.maxPrice = filters.maxPrice;
     if (filters.inStockOnly) params.inStock = true;
+    if (saleOnly) params.onSale = true;
 
     api
       .get('/products/search', { params })
@@ -160,11 +186,17 @@ export default function CustomerProductsLanding() {
     return () => {
       ignore = true;
     };
-  }, [user, page, sort, debouncedSearch, filters]);
+  }, [user, page, sort, debouncedSearch, filters, saleOnly]);
 
   useEffect(() => {
     setPage(1);
-  }, [sort, debouncedSearch, filters]);
+  }, [sort, debouncedSearch, filters, saleOnly]);
+
+  const handleViewAllSale = () => {
+    setSaleOnly(true);
+    setPage(1);
+    document.getElementById('marketplace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleAddToCart = useCallback(
     async (product) => {
@@ -205,9 +237,10 @@ export default function CustomerProductsLanding() {
         <div className="mt-6 rounded-lg bg-accent-light px-4 py-3 text-sm text-accent-dark">{error}</div>
       )}
 
-      {/* Full Marketplace — search up top, sale & recommended picks folded
+      {/* Full Marketplace — search lives in the top bar (see Navbar's
+          customer-dashboard search field), sale & recommended picks folded
           in above the main grid, filters live in the sidebar. */}
-      <section className="mt-10">
+      <section id="marketplace" className="mt-10">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <LayoutGrid size={20} />
@@ -220,90 +253,122 @@ export default function CustomerProductsLanding() {
           </div>
         </div>
 
-        <div className="mt-6">
-          <div className="relative">
-            <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-muted" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => mf?.setSearchInput(e.target.value)}
-              placeholder="Search for products, e.g. Gundruk, Rice, Honey..."
-              className="w-full rounded-full border border-border bg-surface-raised py-3 pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-            />
-          </div>
-        </div>
-
-        {curatedLoading ? (
-          <div className="mt-8">
-            <GridSkeleton />
-          </div>
-        ) : (
-          <>
-            {sale.length > 0 && (
-              <Section icon={Tag} title="Sale & Discounted" subtitle="Limited-time lower prices set by our sellers">
-                <ProductGrid products={sale} onAddToCart={handleAddToCart} />
-              </Section>
-            )}
-
-            {recommended.length > 0 && (
-              <Section icon={Sparkles} title="Recommended" subtitle="Top-rated products across the marketplace">
-                <ProductGrid products={recommended} onAddToCart={handleAddToCart} />
-              </Section>
-            )}
-          </>
-        )}
-
-        <div className="mt-10 border-t border-border pt-10">
-          {marketError && (
-            <div className="mb-6 rounded-lg bg-accent-light px-4 py-3 text-sm text-accent-dark">{marketError}</div>
-          )}
-
-          {marketLoading ? (
-            <GridSkeleton />
-          ) : marketProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-20 text-center">
-              <PackageSearch size={36} className="text-ink-muted" />
-              <p className="mt-4 font-display text-lg font-semibold text-ink">No products found</p>
-              <p className="mt-1 text-sm text-ink-muted">Try adjusting your search or filters.</p>
-              {mf?.hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={mf.clearFilters}
-                  className="mt-5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark"
-                >
-                  Clear Filters
-                </button>
-              )}
+        {/* Sale & Recommended are curated picks, not search results — hide
+            them while the customer is actively searching so the page shows
+            only what they searched for, and bring them back once the
+            search box is cleared. */}
+        {!searchInput.trim() &&
+          (curatedLoading ? (
+            <div className="mt-8">
+              <GridSkeleton />
             </div>
           ) : (
             <>
-              <ProductGrid products={marketProducts} onAddToCart={handleAddToCart} />
+              {sale.length > 0 && (
+                <Section icon={Tag} title="Sale & Discounted" subtitle="Limited-time lower prices set by our sellers">
+                  <ProductGrid products={sale} onAddToCart={handleAddToCart} />
+                  <div className="mt-5 text-center">
+                    <button
+                      type="button"
+                      onClick={handleViewAllSale}
+                      className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold text-ink hover:border-primary hover:text-primary"
+                    >
+                      View All Sale Products
+                    </button>
+                  </div>
+                </Section>
+              )}
 
-              {pagination.pages > 1 && (
-                <div className="mt-10 flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="rounded-full border border-border px-4 py-2 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 text-sm text-ink-muted">
-                    Page {pagination.page} of {pagination.pages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={page >= pagination.pages}
-                    onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
-                    className="rounded-full border border-border px-4 py-2 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
+              {recommended.length > 0 && (
+                <Section icon={Sparkles} title="Recommended" subtitle="Picked for you based on your activity">
+                  <ProductGrid products={recommended} onAddToCart={handleAddToCart} />
+                </Section>
               )}
             </>
+          ))}
+
+        <div className="mt-10 border-t border-border pt-10">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <ShoppingBag size={18} />
+              </span>
+              <div>
+                <h3 className="font-display text-xl font-semibold text-ink">
+                  {debouncedSearch ? 'Search Results' : saleOnly ? 'Sale Products' : 'All Products'}
+                </h3>
+                <p className="text-xs text-ink-muted">
+                  {cappedTotal} product{cappedTotal === 1 ? '' : 's'}
+                  {isCapped && pagination.total > ALL_PRODUCTS_CAP ? ` of ${pagination.total} — search to see more` : ''}
+                </p>
+              </div>
+            </div>
+            {saleOnly && !debouncedSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaleOnly(false);
+                  setPage(1);
+                }}
+                className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-ink hover:border-primary hover:text-primary"
+              >
+                Show All Products
+              </button>
+            )}
+          </div>
+
+          {marketError && (
+            <div className="mt-5 mb-6 rounded-lg bg-accent-light px-4 py-3 text-sm text-accent-dark">{marketError}</div>
           )}
+
+          <div className="mt-5">
+            {marketLoading ? (
+              <GridSkeleton />
+            ) : visibleMarketProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-20 text-center">
+                <PackageSearch size={36} className="text-ink-muted" />
+                <p className="mt-4 font-display text-lg font-semibold text-ink">No products found</p>
+                <p className="mt-1 text-sm text-ink-muted">Try adjusting your search or filters.</p>
+                {mf?.hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={mf.clearFilters}
+                    className="mt-5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <ProductGrid products={visibleMarketProducts} onAddToCart={handleAddToCart} />
+
+                {cappedPages > 1 && (
+                  <div className="mt-10 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="rounded-full border border-border px-4 py-2 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <span className="px-3 text-sm text-ink-muted">
+                      Page {pagination.page} of {cappedPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page >= cappedPages}
+                      onClick={() => setPage((p) => Math.min(cappedPages, p + 1))}
+                      className="rounded-full border border-border px-4 py-2 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </section>
 

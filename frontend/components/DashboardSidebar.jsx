@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { dashboardNav } from '@/utils/dashboardNav';
 import useMarketplaceFilters from '@/context/MarketplaceFiltersContext';
 
@@ -116,13 +116,59 @@ function Logo({ className = '' }) {
   );
 }
 
+// A nav item with sub-links (e.g. Notices -> All Notices / New Notice),
+// rendered as an expand/collapse dropdown instead of navigating on its own —
+// keeps every related page reachable from the same sidebar rather than
+// scattering them across the app.
+function NavItemWithChildren({ item, pathname, forceOpen }) {
+  const active = pathname === item.href || item.children.some((c) => c.href === pathname);
+  const [open, setOpen] = useState(forceOpen || active);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ease-out ${
+          active ? 'bg-primary text-white shadow-sm' : 'text-ink hover:bg-surface-alt hover:text-primary'
+        }`}
+      >
+        <item.icon size={16} className={`shrink-0 ${active ? 'text-white' : 'text-ink-muted group-hover:text-primary'}`} />
+        <span className="flex-1">{item.label}</span>
+        <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-ink-muted'}`} />
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1 border-l border-border pl-4">
+          {item.children.map((child) => {
+            const childActive = pathname === child.href;
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={`block rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
+                  childActive ? 'font-semibold text-primary' : 'text-ink-muted hover:text-primary'
+                }`}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardSidebar({ role }) {
   const pathname = usePathname();
   const groups = dashboardNav[role] || [];
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const mf = useMarketplaceFilters();
 
-  const flatItems = groups.flatMap((g) => g.items);
+  // Mobile chips flatten sub-links in place of their parent (the parent's
+  // own href is always the first child, e.g. Notices -> All Notices) so
+  // every page stays reachable without duplicating a chip/key for it.
+  const flatItems = groups.flatMap((g) => g.items.flatMap((item) => (item.children ? item.children : [item])));
   const showMobileFilters = role === 'customer' && mf?.active;
 
   return (
@@ -189,6 +235,9 @@ export default function DashboardSidebar({ role }) {
               </p>
               <div className="mt-2 space-y-1">
                 {group.items.map((item) => {
+                  if (item.children) {
+                    return <NavItemWithChildren key={item.href} item={item} pathname={pathname} />;
+                  }
                   const active = pathname === item.href;
                   return (
                     <Link

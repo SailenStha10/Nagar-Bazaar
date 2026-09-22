@@ -71,6 +71,7 @@ app.use('/api/officers', require('./routes/officerRoutes'));
 app.use('/api/verification', require('./routes/verificationRoutes'));
 app.use('/api/notices', require('./routes/noticeRoutes'));
 app.use('/api/market-monitoring', require('./routes/marketMonitoringRoutes'));
+app.use('/api/recommendations', require('./routes/recommendationRoutes'));
 
 // 404 handler
 app.use((req, res) => {

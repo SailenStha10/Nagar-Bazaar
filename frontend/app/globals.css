@@ -66,8 +66,14 @@ body {
      never affects layout. Without this, an off-screen entrance near a narrow
      viewport's edge can open a horizontal scrollbar. This never affects
      `position: fixed` elements' own positioning (only `transform`/`filter`
-     on an ancestor does that), so the docked navbar and toasts are unaffected. */
-  overflow-x: hidden;
+     on an ancestor does that), so the docked navbar and toasts are unaffected.
+     `clip`, not `hidden`: `hidden` (or `auto`/`scroll`) on `body` makes it a
+     second scroll container alongside `html` (the real one), which silently
+     breaks `position: sticky` for every descendant — e.g. the dashboard
+     sidebar's Quick Actions panel just scrolled off with the page instead of
+     sticking in place. `clip` suppresses the same overflow without ever
+     establishing a scroll container, so sticky keeps tracking the viewport. */
+  overflow-x: clip;
 }
 
 body {

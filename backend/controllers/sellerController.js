@@ -17,6 +17,8 @@ const formatSeller = async (seller) => ({
   verificationStatus: seller.verificationStatus,
   verifiedBy: seller.verifiedBy,
   verificationDate: seller.verificationDate,
+  rejectionReason: seller.rejectionReason,
+  reviewReason: seller.reviewReason,
   createdAt: seller.createdAt,
 });
 

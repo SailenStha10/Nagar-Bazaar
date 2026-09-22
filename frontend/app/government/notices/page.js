@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Plus, Megaphone, Eye, Pencil, Archive, Trash2 } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
@@ -21,9 +21,14 @@ export default function GovernmentNoticesPage() {
   );
 }
 
+// Reused verbatim at /admin/notices (see app/admin/notices/page.js) — the
+// base path is derived from the URL so links and the auth-redirect stay
+// inside whichever role's area it's mounted under.
 function NoticesManagement() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   const [category, setCategory] = useState('');
   const [showArchived, setShowArchived] = useState(false);
@@ -37,9 +42,9 @@ function NoticesManagement() {
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   const loadNotices = () => {
     setLoading(true);
@@ -94,7 +99,7 @@ function NoticesManagement() {
           <h1 className="mt-2 font-display text-3xl font-semibold text-ink">Manage Notices</h1>
         </div>
         <Link
-          href="/government/notices/new"
+          href={`${basePath}/notices/new`}
           className="flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark"
         >
           <Plus size={15} />
@@ -180,7 +185,7 @@ function NoticesManagement() {
                           <Link href={`/notices/${n.noticeId}`} className="rounded-full border border-border p-1.5 text-ink-muted hover:border-primary hover:text-primary" title="View">
                             <Eye size={14} />
                           </Link>
-                          <Link href={`/government/notices/${n.noticeId}/edit`} className="rounded-full border border-border p-1.5 text-ink-muted hover:border-primary hover:text-primary" title="Edit">
+                          <Link href={`${basePath}/notices/${n.noticeId}/edit`} className="rounded-full border border-border p-1.5 text-ink-muted hover:border-primary hover:text-primary" title="Edit">
                             <Pencil size={14} />
                           </Link>
                           {user.role === 'admin' && (

@@ -12,6 +12,9 @@ import {
   ArrowRight,
   Megaphone,
   Gift,
+  Store,
+  ClipboardList,
+  Award,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,8 +33,23 @@ import useAuth from '@/hooks/useAuth';
 import useCart from '@/hooks/useCart';
 import useWishlist from '@/hooks/useWishlist';
 import api from '@/utils/api';
+import { features } from '@/components/home/data';
 
 const CATEGORY_COLORS = ['#0f2c4c', '#c1712f', '#3e7c59', '#9c5320', '#1e4d7b', '#5c6577'];
+
+// "Shop by category" style quick-links row, mirroring the reference
+// homepage's circular category icons — pointed at this account's own
+// sections instead of product categories.
+const quickLinks = [
+  { href: '/customer/products', label: 'Marketplace', icon: Store, tone: 'bg-primary/10 text-primary' },
+  { href: '/customer/orders', label: 'My Orders', icon: ClipboardList, tone: 'bg-accent-light text-accent-dark' },
+  { href: '/customer/wishlist', label: 'Wishlist', icon: Heart, tone: 'bg-local-light text-local' },
+  { href: '/customer/cart', label: 'Cart', icon: ShoppingCart, tone: 'bg-primary/10 text-primary' },
+  { href: '/customer/complaints', label: 'Complaints', icon: MessageSquareWarning, tone: 'bg-accent-light text-accent-dark' },
+  { href: '/notices', label: 'Notices', icon: Megaphone, tone: 'bg-local-light text-local' },
+  { href: '/customer/rewards', label: 'Rewards', icon: Award, tone: 'bg-primary/10 text-primary' },
+  { href: '/customer/refer-earn', label: 'Refer & Earn', icon: Gift, tone: 'bg-accent-light text-accent-dark' },
+];
 
 const orderStatusBadge = {
   placed: 'bg-accent-light text-accent-dark',
@@ -149,6 +167,18 @@ export default function CustomerDashboard() {
             View Cart
           </Link>
         </div>
+      </div>
+
+      {/* Quick-access category row, like the reference's "Shop by Category" strip */}
+      <div className="mt-8 -mx-4 flex gap-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-8">
+        {quickLinks.map((link) => (
+          <Link key={link.href} href={link.href} className="group flex shrink-0 flex-col items-center gap-2 text-center">
+            <span className={`flex h-16 w-16 items-center justify-center rounded-full ${link.tone} transition-transform duration-200 group-hover:scale-105`}>
+              <link.icon size={22} />
+            </span>
+            <span className="text-xs font-medium text-ink">{link.label}</span>
+          </Link>
+        ))}
       </div>
 
       {/* At-a-glance tinted cards */}
@@ -272,38 +302,45 @@ export default function CustomerDashboard() {
         </div>
       </div>
 
-      {/* Promo-style CTAs */}
-      <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">
-        <div className="flex items-center justify-between gap-4 rounded-2xl bg-accent-light p-6">
-          <div>
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/70 text-accent-dark">
-              <Gift size={20} />
-            </span>
-            <p className="mt-3 font-display text-lg font-semibold text-ink">Have a problem with an order?</p>
-            <p className="mt-1 text-sm text-ink-muted">File a complaint and an officer will review it.</p>
+      {/* Wide promo banners, like the reference's "Weekend Super Saver" /
+          "Get Delivery in 30 Minutes" pair — same shape, this account's own CTAs. */}
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_1fr]">
+        <div className="relative flex items-center gap-6 overflow-hidden rounded-2xl bg-accent-light p-8">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-accent/20 blur-2xl" />
+          <div className="relative">
+            <span className="text-xs font-semibold uppercase tracking-widest text-accent-dark">Customer Support</span>
+            <p className="mt-2 font-display text-2xl font-semibold text-ink sm:text-3xl">Had a problem with an order?</p>
+            <p className="mt-2 max-w-xs text-sm text-ink-muted">File a complaint and a government officer will review it, in the open.</p>
             <Link
               href="/customer/complaints/new"
-              className="mt-4 inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary-dark"
             >
               File a Complaint
+              <ArrowRight size={14} />
             </Link>
           </div>
+          <span className="relative ml-auto hidden h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white/70 text-accent-dark sm:flex">
+            <Gift size={32} />
+          </span>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-2xl bg-local-light p-6">
-          <div>
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/70 text-local">
-              <Megaphone size={20} />
-            </span>
-            <p className="mt-3 font-display text-lg font-semibold text-ink">Stay in the loop</p>
-            <p className="mt-1 text-sm text-ink-muted">Read the latest government notices and price advisories.</p>
+        <div className="relative flex items-center gap-4 overflow-hidden rounded-2xl bg-local-light p-8">
+          <div className="pointer-events-none absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-local/20 blur-2xl" />
+          <div className="relative">
+            <span className="text-xs font-semibold uppercase tracking-widest text-local">Stay Informed</span>
+            <p className="mt-2 font-display text-xl font-semibold text-ink">Government Notices</p>
+            <p className="mt-2 text-sm text-ink-muted">Price ceilings &amp; market advisories, as they&apos;re published.</p>
             <Link
               href="/notices"
-              className="mt-4 inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary-dark"
             >
               View Notices
+              <ArrowRight size={14} />
             </Link>
           </div>
+          <span className="relative ml-auto flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/70 text-local">
+            <Megaphone size={26} />
+          </span>
         </div>
       </div>
 
@@ -415,6 +452,23 @@ export default function CustomerDashboard() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* "Why choose us" strip, like the reference's feature row at the
+          bottom of the homepage — reuses the same value props shown there. */}
+      <div className="mt-8 rounded-2xl border border-border bg-surface-raised p-8">
+        <h2 className="text-center font-display text-lg font-semibold text-ink">Why Shop on Nagar Bazaar</h2>
+        <div className="mt-6 grid grid-cols-2 gap-6 sm:grid-cols-4">
+          {features.map((feature) => (
+            <div key={feature.title} className="flex flex-col items-center gap-2 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <feature.icon size={20} />
+              </span>
+              <p className="text-sm font-semibold text-ink">{feature.title}</p>
+              <p className="text-xs text-ink-muted">{feature.description}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

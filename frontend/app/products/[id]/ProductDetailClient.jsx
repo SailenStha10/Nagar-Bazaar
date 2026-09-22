@@ -14,7 +14,7 @@ import {
   MapPin,
   AlertCircle,
 } from 'lucide-react';
-import api from '@/utils/api';
+import api, { getFileUrl } from '@/utils/api';
 import ProductCard from '@/components/ProductCard';
 import useAuth from '@/hooks/useAuth';
 import useCart from '@/hooks/useCart';
@@ -139,8 +139,20 @@ export default function ProductDetailClient({ id }) {
       </nav>
 
       <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-2">
-        <div className="relative flex h-96 items-center justify-center rounded-3xl bg-linear-to-br from-primary/10 to-accent-light">
-          <ShoppingBag className="text-primary/30" size={72} />
+        <div className="relative flex h-96 items-center justify-center overflow-hidden rounded-3xl bg-linear-to-br from-primary/10 to-accent-light">
+          {product.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={getFileUrl(product.image)}
+              alt={product.name}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = '';
+              }}
+            />
+          ) : null}
+          <ShoppingBag className="text-primary/30" size={72} style={product.image ? { display: 'none' } : undefined} />
           {product.isLocal && (
             <span className="absolute left-5 top-5 flex items-center gap-1.5 rounded-full bg-local-light px-3 py-1.5 text-xs font-semibold text-local">
               <Leaf size={13} />

@@ -43,7 +43,7 @@ export default function AdminChartsSection({ sellerManagement, marketActivity, c
         <div className="rounded-2xl border border-border bg-surface-raised p-6">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-base font-semibold text-ink">Recent Applications</h2>
-            <Link href="/government/sellers" className="text-sm font-semibold text-primary">Review</Link>
+            <Link href="/admin/sellers" className="text-sm font-semibold text-primary">Review</Link>
           </div>
           {sellerManagement.recentApplications.length === 0 ? (
             <p className="mt-4 text-sm text-ink-muted">No seller applications yet.</p>

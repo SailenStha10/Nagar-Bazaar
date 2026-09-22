@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const MarketPrice = require('../models/MarketPrice');
 const GovernmentOfficer = require('../models/GovernmentOfficer');
 const { asString } = require('../utils/sanitize');
+const PriceAnomalyEngine = require('../algorithms/priceAnomaly');
+
+const anomalyEngine = new PriceAnomalyEngine();
 
 const deviationOf = (price, avg) => {
   if (!avg) return 0;
@@ -185,4 +188,52 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-module.exports = { getPrices, getPriceById, updatePriceStatus, getAnalytics };
+/**
+ * POST /api/market-monitoring/scan
+ * Runs the price anomaly detector across active products and refreshes
+ * their MarketPrice records. This is the same routine the daily scheduled
+ * job runs; exposed here so officers/admins can trigger it on demand.
+ */
+const scanPrices = async (req, res) => {
+  try {
+    const result = await anomalyEngine.scanAllProducts();
+    if (!result.success) {
+      return res.status(500).json({ success: false, message: result.error || 'Scan failed' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Price scan complete',
+      productsChecked: result.productsChecked,
+      scanned: result.scanned,
+      flagged: result.flagged,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/market-monitoring/products/:productId/anomaly
+ * Read-only: shows the anomaly-detection breakdown for a single product
+ * (peer average, z-score, deviation) without touching any MarketPrice record.
+ */
+const getProductAnomaly = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    const result = await anomalyEngine.detectAnomaly(productId);
+    if (result.reason === 'Product not found') {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { getPrices, getPriceById, updatePriceStatus, getAnalytics, scanPrices, getProductAnomaly };

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Leaf, Star, MapPin, Heart } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import useWishlist from '@/hooks/useWishlist';
+import { getFileUrl } from '@/utils/api';
 
 export default function LocalProductCard({ product, onAddToCart }) {
   const inStock = product.stock > 0;
@@ -26,7 +27,24 @@ export default function LocalProductCard({ product, onAddToCart }) {
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface-raised transition-all duration-300 ease-out hover:-translate-y-1 hover:border-local/30 hover:shadow-xl">
       <Link href={`/products/${product._id}`} className="relative block">
         <div className="flex h-40 items-center justify-center overflow-hidden bg-linear-to-br from-local-light to-accent-light">
-          <Leaf className="text-local/50 transition-transform duration-300 ease-out group-hover:scale-110" size={32} />
+          {product.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={getFileUrl(product.image)}
+              alt={product.name}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = '';
+              }}
+            />
+          ) : null}
+          <Leaf
+            className="text-local/50 transition-transform duration-300 ease-out group-hover:scale-110"
+            size={32}
+            style={product.image ? { display: 'none' } : undefined}
+          />
         </div>
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {hasDiscount && (

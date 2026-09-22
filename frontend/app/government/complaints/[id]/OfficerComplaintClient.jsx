@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
@@ -11,6 +11,7 @@ import {
   Users,
   ClipboardCheck,
   UserCog,
+  Sparkles,
 } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import api, { getFileUrl } from '@/utils/api';
@@ -32,9 +33,12 @@ const statusBadge = {
   resolved: 'bg-local-light text-local',
 };
 
+// Reused verbatim at /admin/complaints/[id] — see app/admin/complaints/[id]/page.js.
 export default function OfficerComplaintClient({ id }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   const [complaint, setComplaint] = useState(null);
   const [sellerDetail, setSellerDetail] = useState(null);
@@ -50,12 +54,14 @@ export default function OfficerComplaintClient({ id }) {
   const [showReassign, setShowReassign] = useState(false);
   const [selectedOfficerId, setSelectedOfficerId] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [assignmentScore, setAssignmentScore] = useState(null);
+  const [scoreLoading, setScoreLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   const loadComplaint = () => {
     setLoading(true);
@@ -146,6 +152,34 @@ export default function OfficerComplaintClient({ id }) {
     }
   };
 
+  const handleSuggestOfficer = async () => {
+    setActionError('');
+    setScoreLoading(true);
+    try {
+      const res = await api.get(`/complaints/${id}/assignment-score`);
+      setAssignmentScore(res.data);
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to load assignment scores');
+    } finally {
+      setScoreLoading(false);
+    }
+  };
+
+  const handleAutoAssign = async () => {
+    if (!window.confirm(`Auto-assign this complaint to ${assignmentScore?.bestOfficer?.officerName || 'the top-ranked officer'}?`)) return;
+    setActionError('');
+    setActionLoading(true);
+    try {
+      await api.post(`/complaints/${id}/auto-assign`);
+      setAssignmentScore(null);
+      loadComplaint();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to auto-assign complaint');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (!user || !['officer', 'admin'].includes(user.role) || loading) {
     return (
       <div className="mx-auto max-w-5xl animate-pulse px-4 py-10">
@@ -160,7 +194,7 @@ export default function OfficerComplaintClient({ id }) {
       <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center">
         <AlertCircle size={36} className="text-accent-dark" />
         <p className="mt-4 font-display text-xl font-semibold text-ink">{error || 'Complaint not found'}</p>
-        <Link href="/government/complaints" className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
+        <Link href={`${basePath}/complaints`} className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
           Back to Queue
         </Link>
       </div>
@@ -390,6 +424,52 @@ export default function OfficerComplaintClient({ id }) {
               {complaint.assignedOfficer ? complaint.assignedOfficer.name : <span className="text-accent-dark">Unassigned</span>}
             </p>
             {complaint.assignedOfficer?.department && <p className="text-xs text-ink-muted">{complaint.assignedOfficer.department}</p>}
+
+            {!isResolved && user.role === 'admin' && (
+              <div className="mt-4 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={handleSuggestOfficer}
+                  disabled={scoreLoading}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline disabled:opacity-50"
+                >
+                  <Sparkles size={14} />
+                  {scoreLoading ? 'Scoring officers...' : 'Suggest Best Officer'}
+                </button>
+
+                {assignmentScore && (
+                  <div className="mt-3 space-y-3">
+                    {!assignmentScore.bestOfficer ? (
+                      <p className="text-xs text-ink-muted">{assignmentScore.message || 'No active officers available.'}</p>
+                    ) : (
+                      <>
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+                          <p className="text-sm font-semibold text-ink">{assignmentScore.bestOfficer.officerName}</p>
+                          <p className="text-xs text-ink-muted">{assignmentScore.bestOfficer.department}</p>
+                          <p className="mt-1 text-xs font-semibold text-primary">
+                            Score: {assignmentScore.bestOfficer.finalScore.toFixed(2)} / 1.00
+                          </p>
+                          <div className="mt-2 space-y-1 text-[11px] text-ink-muted">
+                            <p>Workload {(assignmentScore.bestOfficer.breakdown.workload * 100).toFixed(0)}%</p>
+                            <p>Expertise {(assignmentScore.bestOfficer.breakdown.expertise * 100).toFixed(0)}%</p>
+                            <p>Experience {(assignmentScore.bestOfficer.breakdown.experience * 100).toFixed(0)}%</p>
+                            <p>Availability {(assignmentScore.bestOfficer.breakdown.availability * 100).toFixed(0)}%</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={handleAutoAssign}
+                          className="w-full rounded-full bg-primary py-2 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
+                        >
+                          Auto-Assign to {assignmentScore.bestOfficer.officerName}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {user.role === 'admin' && (
               <div className="mt-3">

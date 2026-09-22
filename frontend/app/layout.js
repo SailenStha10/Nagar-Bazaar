@@ -26,7 +26,15 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-surface font-sans text-ink">
+      {/* suppressHydrationWarning: some browser extensions (e.g. Bitdefender's
+          TrafficLight) inject bis_skin_checked/bis_register attributes onto
+          <body> before React hydrates, which otherwise reports as a false
+          hydration mismatch here — this only ignores that one node's own
+          attributes, not its children. */}
+      <body
+        className="flex min-h-full flex-col bg-surface font-sans text-ink"
+        suppressHydrationWarning
+      >
         <AuthProvider>
           <CartProvider>
             <WishlistProvider>

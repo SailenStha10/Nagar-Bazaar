@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { getAdminDashboard } = require('../controllers/adminController');
 const { getUsers, getUserById, setUserActive } = require('../controllers/adminUserController');
 const { getProducts, deleteProduct } = require('../controllers/adminProductController');
+const { deleteSeller } = require('../controllers/adminSellerController');
 const { getOfficers, createOfficer, updateOfficer, setOfficerActive } = require('../controllers/adminOfficerController');
 const { protect, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
@@ -19,6 +20,8 @@ router.put('/users/:userId/status', [body('isActive').isBoolean().withMessage('i
 
 router.get('/products', getProducts);
 router.delete('/products/:productId', deleteProduct);
+
+router.delete('/sellers/:sellerId', deleteSeller);
 
 router.get('/officers', getOfficers);
 router.post(

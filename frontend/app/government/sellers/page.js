@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Store, ShieldCheck, ShieldX, ShieldAlert, ShieldQuestion } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
@@ -39,7 +39,9 @@ export default function GovernmentSellersPage() {
 
 function SellersQueue() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   const [searchInput, setSearchInput] = useState('');
   const [status, setStatus] = useState('');
@@ -53,9 +55,9 @@ function SellersQueue() {
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   useEffect(() => {
     if (!user || !['officer', 'admin'].includes(user.role)) return;
@@ -202,7 +204,7 @@ function SellersQueue() {
                         <td className="px-5 py-3 text-ink-muted">{s.productsCount}</td>
                         <td className="px-5 py-3 text-right">
                           <Link
-                            href={`/government/sellers/${s.sellerId}`}
+                            href={`${basePath}/sellers/${s.sellerId}`}
                             className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-primary hover:text-primary"
                           >
                             View

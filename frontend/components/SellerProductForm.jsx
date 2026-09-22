@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ImageIcon, Trash2 } from 'lucide-react';
-import api from '@/utils/api';
+import { ImageIcon, Trash2, Upload, X, Loader2 } from 'lucide-react';
+import api, { getFileUrl } from '@/utils/api';
 
 const emptyForm = {
   name: '',
@@ -26,6 +26,8 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     api
@@ -55,6 +57,35 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrors((prev) => ({ ...prev, image: 'Please choose an image file' }));
+      return;
+    }
+
+    setErrors((prev) => ({ ...prev, image: undefined }));
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+      const res = await api.post('/uploads', formData);
+      const url = res.data.data.urls[0];
+      setForm((prev) => ({ ...prev, image: url }));
+    } catch (err) {
+      setErrors((prev) => ({ ...prev, image: err.response?.data?.message || 'Failed to upload image' }));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, image: '' }));
   };
 
   const validate = () => {
@@ -152,34 +183,22 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink">Category</label>
-              <select
-                name="categoryId"
-                value={form.categoryId}
-                onChange={handleChange}
-                className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-primary"
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.icon} {c.name}
-                  </option>
-                ))}
-              </select>
-              {errors.categoryId && <p className="mt-1 text-xs text-accent-dark">{errors.categoryId}</p>}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink">Image URL</label>
-              <input
-                name="image"
-                value={form.image}
-                onChange={handleChange}
-                placeholder="https://..."
-                className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-primary"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-ink">Category</label>
+            <select
+              name="categoryId"
+              value={form.categoryId}
+              onChange={handleChange}
+              className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-primary"
+            >
+              <option value="">Select category</option>
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.icon} {c.name}
+                </option>
+              ))}
+            </select>
+            {errors.categoryId && <p className="mt-1 text-xs text-accent-dark">{errors.categoryId}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -306,27 +325,58 @@ export default function SellerProductForm({ initialValues, onSubmit, onDelete, s
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-surface-raised p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Image Preview</p>
-            <div className="mt-3 flex h-40 items-center justify-center overflow-hidden rounded-xl bg-surface-alt">
-              {form.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={form.image}
-                  alt="Preview"
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Product Photo</p>
+            <div className="relative mt-3 flex h-40 items-center justify-center overflow-hidden rounded-xl bg-surface-alt">
+              {uploadingImage ? (
+                <Loader2 size={24} className="animate-spin text-ink-muted" />
+              ) : form.image ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getFileUrl(form.image)}
+                    alt="Product"
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    aria-label="Remove photo"
+                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                  >
+                    <X size={14} />
+                  </button>
+                </>
               ) : (
                 <ImageIcon size={28} className="text-ink-muted" />
               )}
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-border py-2.5 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
+            >
+              <Upload size={15} />
+              {uploadingImage ? 'Uploading...' : form.image ? 'Change Photo' : 'Upload from Device'}
+            </button>
+            <p className="mt-2 text-[11px] text-ink-muted">JPEG, PNG, GIF, or WEBP. Up to 5MB.</p>
+            {errors.image && <p className="mt-1 text-xs text-accent-dark">{errors.image}</p>}
           </div>
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || uploadingImage}
             className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
           >
             {submitting ? 'Saving...' : submitLabel}

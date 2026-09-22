@@ -129,7 +129,13 @@ export default function CheckoutPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-ink">{item.product.name}</p>
                     <p className="text-xs text-ink-muted">
-                      Qty {item.quantity} &times; NPR {item.product.price.toLocaleString('en-NP')}
+                      Qty {item.quantity} &times; NPR {item.price.toLocaleString('en-NP')}
+                      {item.discountPercent > 0 && (
+                        <>
+                          {' '}
+                          <span className="line-through">NPR {item.product.price.toLocaleString('en-NP')}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-primary">

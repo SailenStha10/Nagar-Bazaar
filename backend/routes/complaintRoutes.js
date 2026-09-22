@@ -9,6 +9,7 @@ const {
   assignOfficer,
   resolveComplaint,
 } = require('../controllers/complaintController');
+const { getAssignmentScore, autoAssignComplaint } = require('../controllers/complaintAssignmentController');
 const { protect, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 
@@ -55,6 +56,9 @@ router.put(
   validate,
   assignOfficer
 );
+
+router.get('/:complaintId/assignment-score', authorize(['admin']), getAssignmentScore);
+router.post('/:complaintId/auto-assign', authorize(['admin']), autoAssignComplaint);
 
 router.put(
   '/:complaintId/resolve',

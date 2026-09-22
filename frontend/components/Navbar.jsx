@@ -53,9 +53,12 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
 
-  // Sellers get their own slim top bar (search + notifications + profile)
-  // instead of the site-wide navbar — see components/SellerTopBar.jsx.
-  if (user?.role === 'seller') return null;
+  // Sellers, officers and admins get their own slim top bar (search +
+  // notifications + profile) instead of the site-wide navbar — see
+  // components/SellerTopBar.jsx, components/GovernmentTopBar.jsx and
+  // components/AdminTopBar.jsx. The admin login screen itself (bare route,
+  // no user yet) still falls through to the default navbar below.
+  if (user?.role === 'seller' || user?.role === 'officer' || (user?.role === 'admin' && pathname !== '/admin')) return null;
 
   const isCustomer = user?.role === 'customer';
   const inSidebarArea = Boolean(user) && SIDEBAR_ROLE_PREFIXES.some((p) => pathname.startsWith(p));

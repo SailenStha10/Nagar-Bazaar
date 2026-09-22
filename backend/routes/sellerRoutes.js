@@ -21,6 +21,7 @@ const {
   updateOrderStatus,
 } = require('../controllers/sellerOrderController');
 const { protect, authorize } = require('../middleware/auth');
+const { requireApprovedSeller } = require('../middleware/sellerVerification');
 const validate = require('../middleware/validate');
 
 const router = express.Router();
@@ -75,13 +76,14 @@ const productValidation = [
   body('discountValue').optional().isFloat({ min: 0 }).withMessage('Discount value must be a non-negative number'),
 ];
 
-router.post('/products', protect, authorize(['seller']), productValidation, validate, addSellerProduct);
-router.get('/products', protect, authorize(['seller']), getSellerProducts);
+router.post('/products', protect, authorize(['seller']), requireApprovedSeller, productValidation, validate, addSellerProduct);
+router.get('/products', protect, authorize(['seller']), requireApprovedSeller, getSellerProducts);
 
 router.put(
   '/products/:productId',
   protect,
   authorize(['seller']),
+  requireApprovedSeller,
   [
     body('name').optional().trim().notEmpty().withMessage('Product name cannot be empty'),
     body('description').optional().isString(),
@@ -98,17 +100,18 @@ router.put(
   updateSellerProduct
 );
 
-router.get('/products/:productId', protect, authorize(['seller']), getSellerProductById);
-router.delete('/products/:productId', protect, authorize(['seller']), deleteSellerProduct);
+router.get('/products/:productId', protect, authorize(['seller']), requireApprovedSeller, getSellerProductById);
+router.delete('/products/:productId', protect, authorize(['seller']), requireApprovedSeller, deleteSellerProduct);
 
-router.get('/dashboard', protect, authorize(['seller']), getSellerDashboard);
+router.get('/dashboard', protect, authorize(['seller']), requireApprovedSeller, getSellerDashboard);
 
-router.get('/orders', protect, authorize(['seller']), getSellerOrders);
-router.get('/orders/:orderId', protect, authorize(['seller']), getSellerOrderById);
+router.get('/orders', protect, authorize(['seller']), requireApprovedSeller, getSellerOrders);
+router.get('/orders/:orderId', protect, authorize(['seller']), requireApprovedSeller, getSellerOrderById);
 router.put(
   '/orders/:orderId/status',
   protect,
   authorize(['seller']),
+  requireApprovedSeller,
   [body('status').isIn(['confirmed', 'shipped', 'delivered']).withMessage('Invalid status')],
   validate,
   updateOrderStatus

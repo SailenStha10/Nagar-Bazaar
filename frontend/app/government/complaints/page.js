@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search,
@@ -68,10 +68,16 @@ export default function GovernmentComplaintsPage() {
   );
 }
 
+// This page is reused verbatim at /admin/complaints (see app/admin/complaints/page.js) —
+// it derives its own base path from the URL so links and the auth-redirect
+// stay inside whichever role's area it's mounted under, instead of always
+// pointing back into /government/* for an admin viewer.
 function ComplaintsQueue() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -90,9 +96,9 @@ function ComplaintsQueue() {
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
@@ -283,7 +289,7 @@ function ComplaintsQueue() {
                         <td className="px-5 py-3 text-ink-muted">{daysOpen(c.createdAt)}d</td>
                         <td className="px-5 py-3 text-right">
                           <Link
-                            href={`/government/complaints/${c.complaintId}`}
+                            href={`${basePath}/complaints/${c.complaintId}`}
                             className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-primary hover:text-primary"
                           >
                             View

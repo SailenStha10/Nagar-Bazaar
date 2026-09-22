@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, ArrowLeft, Store, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -13,9 +13,13 @@ const statusBadge = {
   review_required: 'bg-accent-dark text-white',
 };
 
+// Reused verbatim at /admin/market-monitoring/[priceId] — see
+// app/admin/market-monitoring/[priceId]/page.js.
 export default function PriceDetailClient({ priceId }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   const [price, setPrice] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,9 +31,9 @@ export default function PriceDetailClient({ priceId }) {
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   const loadPrice = () => {
     setLoading(true);
@@ -79,7 +83,7 @@ export default function PriceDetailClient({ priceId }) {
       <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center">
         <AlertCircle size={36} className="text-accent-dark" />
         <p className="mt-4 font-display text-xl font-semibold text-ink">{error || 'Price record not found'}</p>
-        <Link href="/government/market-monitoring" className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
+        <Link href={`${basePath}/market-monitoring`} className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
           Back to Monitoring
         </Link>
       </div>
@@ -94,7 +98,7 @@ export default function PriceDetailClient({ priceId }) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <Link href="/government/market-monitoring" className="flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-primary">
+      <Link href={`${basePath}/market-monitoring`} className="flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-primary">
         <ArrowLeft size={15} />
         Back to Monitoring
       </Link>

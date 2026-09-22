@@ -146,6 +146,104 @@ describe('GET /api/products/search', () => {
   });
 });
 
+describe('GET /api/products/search - ranking (Sprint 4, Ticket 4.2)', () => {
+  it('ranks a stronger name/description match above a weaker one, and attaches relevanceScore', async () => {
+    const { seller } = await createSeller();
+    const category = await createCategory();
+    await createProduct({
+      sellerId: seller._id,
+      categoryId: category._id,
+      name: 'Basmati Rice 5kg',
+      description: 'Basmati Rice',
+    });
+    await createProduct({
+      sellerId: seller._id,
+      categoryId: category._id,
+      name: 'Rice Cooker',
+      description: 'An electric appliance, not food',
+    });
+
+    const res = await request(app).get('/api/products/search').query({ q: 'rice' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.length).toBe(2);
+    expect(res.body.data[0].name).toBe('Basmati Rice 5kg');
+    expect(res.body.data[0]).toHaveProperty('relevanceScore');
+    expect(res.body.data[0].relevanceScore).toBeGreaterThanOrEqual(res.body.data[1].relevanceScore);
+  });
+
+  it('still applies category/price/inStock filters when ranking', async () => {
+    const { seller } = await createSeller();
+    const category = await createCategory();
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Rice Bag', price: 1000, stock: 0 });
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Rice Pack', price: 100, stock: 5 });
+
+    const res = await request(app).get('/api/products/search').query({ q: 'rice', inStock: 'true' });
+
+    expect(res.body.data.map((p) => p.name)).toEqual(['Rice Pack']);
+  });
+});
+
+describe('GET /api/products/search - typo suggestions (Sprint 5, Ticket 5.2)', () => {
+  it('returns a "did you mean" suggestion when a typo matches no products by substring', async () => {
+    const { seller } = await createSeller();
+    const category = await createCategory();
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Mustard Oil' });
+
+    const res = await request(app).get('/api/products/search').query({ q: 'Mustrd Oil' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.suggestions.length).toBeGreaterThan(0);
+    expect(res.body.suggestions[0].corrected).toBe('Mustard Oil');
+  });
+
+  it('returns an empty suggestions array when there are real substring matches', async () => {
+    const { seller } = await createSeller();
+    const category = await createCategory();
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Basmati Rice' });
+
+    const res = await request(app).get('/api/products/search').query({ q: 'rice' });
+
+    expect(res.body.data.length).toBe(1);
+    expect(res.body.suggestions).toEqual([]);
+  });
+
+  it('still suggests a correction when the matching product name has a quantity suffix', async () => {
+    // Regression: "Potato (1kg)" used to score too low as a whole string
+    // against "potatoe" to ever surface as a suggestion.
+    const { seller } = await createSeller();
+    const category = await createCategory();
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Potato (1kg)' });
+
+    const res = await request(app).get('/api/products/search').query({ q: 'potatoe' });
+
+    expect(res.body.data).toEqual([]);
+    expect(res.body.suggestions.length).toBeGreaterThan(0);
+    expect(res.body.suggestions[0].corrected).toBe('Potato (1kg)');
+  });
+});
+
+describe('GET /api/products/suggestions (Sprint 4, Ticket 4.2)', () => {
+  it('returns prefix-matching product names', async () => {
+    const { seller } = await createSeller();
+    const category = await createCategory();
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Gundruk Pickle' });
+    await createProduct({ sellerId: seller._id, categoryId: category._id, name: 'Mustard Oil' });
+
+    const res = await request(app).get('/api/products/suggestions').query({ q: 'gund' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(['Gundruk Pickle']);
+  });
+
+  it('returns [] for an empty prefix', async () => {
+    const res = await request(app).get('/api/products/suggestions').query({ q: '' });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
 describe('POST /api/sellers/products (seller product creation authorization)', () => {
   it('rejects a request without a token', async () => {
     const res = await request(app).post('/api/sellers/products').send({ name: 'No Auth Product' });

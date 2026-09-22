@@ -130,7 +130,16 @@ export default function CartPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-4 text-ink-muted">{item.product.sellerId?.shopName || '—'}</td>
-                    <td className="px-5 py-4 text-ink-muted">NPR {item.product.price.toLocaleString('en-NP')}</td>
+                    <td className="px-5 py-4 text-ink-muted">
+                      {item.discountPercent > 0 ? (
+                        <div className="flex flex-col">
+                          <span className="font-medium text-local">NPR {item.price.toLocaleString('en-NP')}</span>
+                          <span className="text-xs text-ink-muted line-through">NPR {item.product.price.toLocaleString('en-NP')}</span>
+                        </div>
+                      ) : (
+                        `NPR ${item.product.price.toLocaleString('en-NP')}`
+                      )}
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center rounded-full border border-border">
                         <button
@@ -192,7 +201,14 @@ export default function CartPage() {
                       {item.product.name}
                     </Link>
                     <p className="mt-0.5 text-xs text-ink-muted">{item.product.sellerId?.shopName || '—'}</p>
-                    <p className="mt-1 text-sm text-ink-muted">NPR {item.product.price.toLocaleString('en-NP')}</p>
+                    {item.discountPercent > 0 ? (
+                      <p className="mt-1 text-sm">
+                        <span className="font-medium text-local">NPR {item.price.toLocaleString('en-NP')}</span>{' '}
+                        <span className="text-xs text-ink-muted line-through">NPR {item.product.price.toLocaleString('en-NP')}</span>
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-ink-muted">NPR {item.product.price.toLocaleString('en-NP')}</p>
+                    )}
                   </div>
                   <button
                     type="button"

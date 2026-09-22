@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
@@ -12,6 +12,7 @@ import {
   MessageSquareWarning,
   Landmark,
   Clock,
+  Trash2,
 } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import api, { getFileUrl } from '@/utils/api';
@@ -30,9 +31,12 @@ const maskAccountNumber = (num) => {
   return `${'•'.repeat(str.length - 4)}${str.slice(-4)}`;
 };
 
+// Reused verbatim at /admin/sellers/[id] — see app/admin/sellers/[id]/page.js.
 export default function SellerVerificationClient({ id }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,9 +52,9 @@ export default function SellerVerificationClient({ id }) {
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   const loadSeller = () => {
     setLoading(true);
@@ -104,6 +108,19 @@ export default function SellerVerificationClient({ id }) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Permanently delete "${seller.shopName}" and all of their product listings? This cannot be undone.`)) return;
+    setActionError('');
+    setActionLoading(true);
+    try {
+      await api.delete(`/admin/sellers/${id}`);
+      router.push(`${basePath}/sellers`);
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to delete seller');
+      setActionLoading(false);
+    }
+  };
+
   const handleReview = async (e) => {
     e.preventDefault();
     if (reviewReason.trim().length < 5) {
@@ -138,7 +155,7 @@ export default function SellerVerificationClient({ id }) {
       <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center">
         <AlertCircle size={36} className="text-accent-dark" />
         <p className="mt-4 font-display text-xl font-semibold text-ink">{error || 'Seller not found'}</p>
-        <Link href="/government/sellers" className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
+        <Link href={`${basePath}/sellers`} className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
           Back to Verification Queue
         </Link>
       </div>
@@ -378,6 +395,25 @@ export default function SellerVerificationClient({ id }) {
                   </button>
                 </form>
               )}
+            </div>
+          )}
+
+          {canAct && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+              <h2 className="font-display text-sm font-semibold text-red-700">Danger Zone</h2>
+              <p className="mt-2 text-sm text-red-700/80">
+                Permanently removes this seller and their product listings from the marketplace. Their account is
+                deactivated, not deleted, and past orders and reviews are kept as historical records.
+              </p>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleDelete}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                Delete Seller
+              </button>
             </div>
           )}
 

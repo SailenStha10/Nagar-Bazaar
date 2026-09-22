@@ -207,7 +207,10 @@ export default function SellerDashboard() {
   }
 
   if (needsRegistration) {
-    return <SellerRegistrationForm onRegistered={loadDashboard} />;
+    // Full reload (not loadDashboard()) so DashboardShell re-checks
+    // verification status too — it only fetches once per mount, and a
+    // freshly created profile starts out 'pending', not 'approved'.
+    return <SellerRegistrationForm onRegistered={() => window.location.reload()} />;
   }
 
   if (error || !data) {

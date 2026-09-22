@@ -84,7 +84,16 @@ export const dashboardNav = {
       title: 'Operations',
       items: [
         { href: '/admin/complaints', label: 'Complaints', icon: ClipboardList },
-        { href: '/admin/notices', label: 'Notices', icon: Megaphone },
+        {
+          href: '/admin/notices',
+          label: 'Notices',
+          icon: Megaphone,
+          children: [
+            { href: '/admin/notices', label: 'All Notices', icon: Megaphone },
+            { href: '/admin/notices/new', label: 'New Notice', icon: FilePlus },
+          ],
+        },
+        { href: '/admin/market-monitoring', label: 'Market Monitoring', icon: LineChart },
         { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
       ],
     },

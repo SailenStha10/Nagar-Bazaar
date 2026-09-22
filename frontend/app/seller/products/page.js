@@ -13,8 +13,24 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
-import api from '@/utils/api';
+import api, { getFileUrl } from '@/utils/api';
 import { computeDiscount } from '@/utils/discount';
+
+function ProductThumb({ product, className }) {
+  if (!product.image) {
+    return (
+      <span className={`flex shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary/10 to-accent-light ${className}`}>
+        <ShoppingBag size={16} className="text-primary/50" />
+      </span>
+    );
+  }
+  return (
+    <span className={`shrink-0 overflow-hidden rounded-lg bg-linear-to-br from-primary/10 to-accent-light ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={getFileUrl(product.image)} alt={product.name} className="h-full w-full object-cover" />
+    </span>
+  );
+}
 
 const sortOptions = [
   { value: 'createdAt-desc', label: 'Newest First' },
@@ -210,9 +226,7 @@ export default function SellerProductsPage() {
                     <tr key={product._id} className={deletingId === product._id ? 'opacity-50' : ''}>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary/10 to-accent-light">
-                            <ShoppingBag size={16} className="text-primary/50" />
-                          </span>
+                          <ProductThumb product={product} className="h-10 w-10" />
                           <span className="font-medium text-ink">{product.name}</span>
                         </div>
                       </td>
@@ -285,9 +299,7 @@ export default function SellerProductsPage() {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary/10 to-accent-light">
-                      <ShoppingBag size={18} className="text-primary/50" />
-                    </span>
+                    <ProductThumb product={product} className="h-12 w-12" />
                     <div className="flex-1">
                       <p className="font-medium text-ink">{product.name}</p>
                       <p className="text-xs text-ink-muted">{product.categoryId?.name || '—'}</p>

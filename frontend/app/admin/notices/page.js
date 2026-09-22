@@ -1,14 +1,5 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-export default function AdminNoticesRedirect() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/government/notices');
-  }, [router]);
-
-  return null;
-}
+// Renders the same notices management UI used by government officers, kept
+// in the admin section (with the admin sidebar) instead of redirecting into
+// /government/* — see app/government/notices/page.js for the shared
+// implementation, which derives its own links from the current path.
+export { default } from '@/app/government/notices/page';

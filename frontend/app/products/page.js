@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, SlidersHorizontal, PackageSearch } from 'lucide-react';
+import { Search, SlidersHorizontal, PackageSearch, Sparkles } from 'lucide-react';
 import api from '@/utils/api';
 import ProductCard from '@/components/ProductCard';
 import useAuth from '@/hooks/useAuth';
@@ -39,11 +39,53 @@ export default function ProductsPage() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [didYouMean, setDidYouMean] = useState([]);
+
+  useEffect(() => {
+    if (user?.role !== 'customer') {
+      setRecommendations([]);
+      return;
+    }
+    let ignore = false;
+    api
+      .get(`/recommendations/${user.userId}`, { params: { limit: 8 } })
+      .then((res) => {
+        if (!ignore) setRecommendations(res.data.data || []);
+      })
+      .catch(() => {
+        if (!ignore) setRecommendations([]);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [user?.userId, user?.role]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    if (debouncedSearch.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let ignore = false;
+    api
+      .get('/products/suggestions', { params: { q: debouncedSearch } })
+      .then((res) => {
+        if (!ignore) setSuggestions(res.data.data || []);
+      })
+      .catch(() => {
+        if (!ignore) setSuggestions([]);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [debouncedSearch]);
 
   useEffect(() => {
     api
@@ -71,6 +113,7 @@ export default function ProductsPage() {
         if (ignore) return;
         setProducts(res.data.data || []);
         setPagination(res.data.pagination || { page: 1, limit: 12, total: 0, pages: 1 });
+        setDidYouMean(res.data.suggestions || []);
       })
       .catch(() => {
         if (!ignore) setError('Failed to load products. Please try again.');
@@ -127,6 +170,21 @@ export default function ProductsPage() {
         </p>
       </div>
 
+      {/* Curated picks, not search results — hide while actively searching. */}
+      {!searchInput.trim() && recommendations.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2">
+            <Sparkles size={18} className="text-primary" />
+            <h2 className="font-display text-xl font-semibold text-ink">Recommended For You</h2>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {recommendations.map((rec) => (
+              <ProductCard key={rec.productId} product={rec.product} onAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 flex items-center gap-3">
         <div className="relative flex-1">
           <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-muted" />
@@ -134,9 +192,31 @@ export default function ProductsPage() {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="Search for products, e.g. Gundruk, Rice, Honey..."
             className="w-full rounded-full border border-border bg-surface-raised py-3 pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="absolute left-0 right-0 top-full z-20 mt-1.5 overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-lg">
+              {suggestions.map((name) => (
+                <li key={name}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSearchInput(name);
+                      setShowSuggestions(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-alt"
+                  >
+                    <Search size={14} className="text-ink-muted" />
+                    {name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <button
           type="button"
@@ -266,6 +346,24 @@ export default function ProductsPage() {
               <PackageSearch size={36} className="text-ink-muted" />
               <p className="mt-4 font-display text-lg font-semibold text-ink">No products found</p>
               <p className="mt-1 text-sm text-ink-muted">Try adjusting your search or filters.</p>
+              {didYouMean.length > 0 && (
+                <p className="mt-3 text-sm text-ink">
+                  Did you mean{' '}
+                  {didYouMean.map((s, i) => (
+                    <span key={s.corrected}>
+                      <button
+                        type="button"
+                        onClick={() => setSearchInput(s.corrected)}
+                        className="font-semibold text-primary hover:underline"
+                      >
+                        {s.corrected}
+                      </button>
+                      {i < didYouMean.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                  ?
+                </p>
+              )}
               {hasActiveFilters && (
                 <button
                   type="button"

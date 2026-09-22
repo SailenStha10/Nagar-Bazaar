@@ -72,6 +72,37 @@ describe('POST /api/orders/checkout', () => {
     expect(cartRes.body.data.items).toEqual([]);
   });
 
+  it('charges the discounted price, not the full catalog price', async () => {
+    const { token } = await createUser({ role: 'customer' });
+    const { seller } = await createSeller();
+    const { product } = await createProduct({ sellerId: seller._id, price: 200, stock: 10 });
+
+    const Product = require('../models/Product');
+    await Product.findByIdAndUpdate(product._id, { discountType: 'percentage', discountValue: 25 });
+
+    await addToCart(token, product._id.toString(), 2);
+
+    // The cart itself should already reflect the discounted unit price.
+    const cartRes = await request(app).get('/api/cart').set('Authorization', `Bearer ${token}`);
+    expect(cartRes.body.data.items[0].price).toBe(150);
+    expect(cartRes.body.data.totalPrice).toBe(300);
+
+    const res = await request(app)
+      .post('/api/orders/checkout')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ deliveryAddress: 'Baneshwor, Kathmandu', paymentMethod: 'cod' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.totalAmount).toBe(300);
+    expect(res.body.data.items[0].price).toBe(150);
+
+    const orderRes = await request(app)
+      .get(`/api/orders/${res.body.data.orderId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(orderRes.body.data.totalAmount).toBe(300);
+    expect(orderRes.body.data.items[0].price).toBe(150);
+  });
+
   it('rejects checkout when requested quantity exceeds stock', async () => {
     const { token } = await createUser({ role: 'customer' });
     const { seller } = await createSeller();

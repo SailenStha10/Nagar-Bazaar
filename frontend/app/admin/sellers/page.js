@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Store } from 'lucide-react';
+import { Search, Store, Trash2 } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import api from '@/utils/api';
 
@@ -26,6 +26,7 @@ export default function AdminSellersPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
@@ -33,8 +34,7 @@ export default function AdminSellersPage() {
     }
   }, [authLoading, user, router]);
 
-  useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+  const loadSellers = () => {
     setLoading(true);
     setError('');
     const params = { page, limit: 10 };
@@ -47,7 +47,24 @@ export default function AdminSellersPage() {
       })
       .catch((err) => setError(err.response?.data?.message || 'Failed to load sellers'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    loadSellers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, page, status]);
+
+  const handleDelete = async (seller) => {
+    if (!window.confirm(`Permanently delete "${seller.shopName}" and all of their product listings? This cannot be undone.`)) return;
+    setActionError('');
+    try {
+      await api.delete(`/admin/sellers/${seller.sellerId}`);
+      loadSellers();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to delete seller');
+    }
+  };
 
   const filteredSellers = searchInput.trim()
     ? sellers.filter(
@@ -92,6 +109,7 @@ export default function AdminSellersPage() {
       </div>
 
       {error && <div className="mt-6 rounded-lg bg-accent-light px-4 py-3 text-sm text-accent-dark">{error}</div>}
+      {actionError && <div className="mt-6 rounded-lg bg-accent-light px-4 py-3 text-sm text-accent-dark">{actionError}</div>}
 
       <div className="mt-6">
         {loading ? (
@@ -131,13 +149,23 @@ export default function AdminSellersPage() {
                           {s.status.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <Link
-                          href={`/government/sellers/${s.sellerId}`}
-                          className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-primary hover:text-primary"
-                        >
-                          View / Approve
-                        </Link>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/admin/sellers/${s.sellerId}`}
+                            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-primary hover:text-primary"
+                          >
+                            View / Approve
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(s)}
+                            className="rounded-full border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

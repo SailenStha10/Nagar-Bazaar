@@ -1,28 +1,31 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import api from '@/utils/api';
 import NoticeForm from '@/components/NoticeForm';
 
+// Reused verbatim at /admin/notices/new — see app/admin/notices/new/page.js.
 export default function NewNoticePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
   const [success, setSuccess] = useState(false);
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   if (!user || !['officer', 'admin'].includes(user.role)) return null;
 
   const handleSubmit = async (payload) => {
     await api.post('/notices', payload);
     setSuccess(true);
-    setTimeout(() => router.push('/government/notices'), 800);
+    setTimeout(() => router.push(`${basePath}/notices`), 800);
   };
 
   return (

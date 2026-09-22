@@ -1,26 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import api from '@/utils/api';
 import NoticeForm from '@/components/NoticeForm';
 
+// Reused verbatim at /admin/notices/[id]/edit — see app/admin/notices/[id]/edit/page.js.
 export default function EditNoticeClient({ id }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
   const [notice, setNotice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const basePath = pathname.startsWith('/admin') ? '/admin' : '/government';
 
   useEffect(() => {
     if (!authLoading && (!user || !['officer', 'admin'].includes(user.role))) {
-      router.push('/login');
+      router.push(basePath === '/admin' ? '/admin' : '/login');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, basePath]);
 
   useEffect(() => {
     if (!user || !['officer', 'admin'].includes(user.role)) return;
@@ -45,7 +48,7 @@ export default function EditNoticeClient({ id }) {
       <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center">
         <AlertCircle size={36} className="text-accent-dark" />
         <p className="mt-4 font-display text-xl font-semibold text-ink">{error || 'Notice not found'}</p>
-        <Link href="/government/notices" className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
+        <Link href={`${basePath}/notices`} className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
           Back to Notices
         </Link>
       </div>
@@ -55,7 +58,7 @@ export default function EditNoticeClient({ id }) {
   const handleSubmit = async (payload) => {
     await api.put(`/notices/${id}`, payload);
     setSuccess(true);
-    setTimeout(() => router.push('/government/notices'), 800);
+    setTimeout(() => router.push(`${basePath}/notices`), 800);
   };
 
   return (
