@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-const SERVER_ORIGIN = API_URL.replace(/\/api\/?$/, '');
+// The backend mounts every route under /api, so make sure the base URL ends with it even
+// if NEXT_PUBLIC_API_URL was set to just the host (e.g. https://backend.example.com).
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const SERVER_ORIGIN = RAW_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
+const API_URL = `${SERVER_ORIGIN}/api`;
 
 const api = axios.create({
   baseURL: API_URL,
